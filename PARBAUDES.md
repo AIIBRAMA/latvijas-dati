@@ -1,3 +1,15 @@
+# Atjauninājuma 1.1 pārbaudes — 2026-10-05
+
+- Abi XLSX faili saņemti no norādītajiem data.gov.lv resursiem.
+- EKK: 91 728 rindas × 32 kolonnas. FKK: 2533 rindas × 22 kolonnas.
+- Importētājs saglabā visas rindas; tekstu kolonnas glabā kompaktā vārdnīcu formā. Lielākā JSON kopija ir aptuveni 7,4 MB un tiek ielādēta tikai, atverot resursa tabulu.
+- Neatkarīga pārbaude ar openpyxl salīdzina katru pārveidoto šūnu ar sākotnējo XLSX, arī identifikatorus, avota “#”, tukšumus un summas. **2 991 022 šūnas salīdzinātas, 0 atšķirību.**
+- `npm test`: 12 JavaScript pārbaudes. Papildus `python3 -m unittest discover -s lv/tests -p 'test_*.py'`: 4 importētāja pārbaudes.
+- Reālu datu atlase: 2025. gads + 1. mēnesis + “Izpilde” atgriež 2057 EKK rindas un 62 FKK rindas. Visas šīs rindas ir pieejamas atlases CSV, neatkarīgi no tabulas lapas.
+- Vēl nav pārbaudīta atjauninājuma darbība pilnā pārlūka sesijā vai tā publicēšana lietotāja GitHub kontā. Iepriekšējā vietnes versija ir publicēta; šis ZIP to automātiski nemaina.
+
+---
+
 # Piegādes pārbaudes — 2026-10-05
 
 ## Pārbaudīts

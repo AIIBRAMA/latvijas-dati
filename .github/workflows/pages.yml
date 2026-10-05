@@ -24,6 +24,7 @@ jobs:
           python-version: '3.12'
       - run: npm ci --ignore-scripts
       - run: npm test
+      - run: python3 -m unittest discover -s lv/tests -p "test_*.py"
       # A failed sync fails this deployment, keeping the previously published site.
       - run: npm run sync
       - run: npm run build

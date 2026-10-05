@@ -3,6 +3,11 @@ export const normalize = (value = '') => String(value ?? '').normalize('NFD').re
 export const format = (value = '') => String(value ?? '').trim().replace(/^\./, '').toUpperCase() || 'CITS';
 export const date = (value) => value && !Number.isNaN(Date.parse(value)) ? new Date(value.endsWith('Z') || /[+-]\d\d:\d\d$/.test(value) ? value : `${value}Z`).toLocaleDateString('lv-LV') : 'Nav norādīts';
 export const safeUrl = (value) => {try {const url = new URL(value); return ['http:', 'https:'].includes(url.protocol) ? url.href : null;} catch {return null;}};
+export const hasPreview = (resource) => Boolean(resource.datastore_active || resource.local_preview);
+export function mergePreviewResources(live, snapshot) {
+    const originals = new Map(snapshot.map((r) => [r.id, r]));
+    return live.map((r) => {const old = originals.get(r.id); return {...r, ...(old?.local_preview && old.url === r.url ? {local_preview: old.local_preview} : {})};});
+}
 export function filterDatasets(datasets, filters = {}, saved = []) {
     const terms = normalize(filters.q).split(/\s+/).filter(Boolean);
     const result = datasets.filter((d) => {
@@ -12,7 +17,7 @@ export function filterDatasets(datasets, filters = {}, saved = []) {
             (!filters.org || d.organization?.name === filters.org) &&
             (!filters.format || d.resources?.some((r) => format(r.format) === filters.format)) &&
             (!filters.saved || saved.includes(d.id)) &&
-            (!filters.preview || d.resources?.some((r) => r.datastore_active));
+            (!filters.preview || d.resources?.some(hasPreview));
     });
     return result.sort((a, b) => filters.sort === 'title' ? (a.title || '').localeCompare(b.title || '', 'lv') : (b.metadata_modified || '').localeCompare(a.metadata_modified || ''));
 }
@@ -26,7 +31,7 @@ export function facets(datasets, type) {
 }
 export function csvCell(value) {
     let text = String(value ?? '');
-    if (/^[\s]*[=+\-@]/.test(text)) text = "'" + text;
+    if (typeof value === 'string' && /^[\s]*[=+\-@]/.test(text)) text = "'" + text;
     return '"' + text.replace(/"/g, '""') + '"';
 }
 export function catalogCsv(datasets) {

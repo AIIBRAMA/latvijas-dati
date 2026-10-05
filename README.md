@@ -2,6 +2,23 @@
 
 Latviska atvērto datu izpētes vietne, pielāgota no [USAspending](https://github.com/fedspendingtransparency/usaspending-website) idejas un atvērtā koda komponentēm. Avots: [Latvijas Atvērto datu portāls](https://data.gov.lv/lv).
 
+## Atjauninājums 1.1 — Valsts kases XLSX tabulas
+
+Diviem datu kopas “No valsts budžeta daļēji finansētu atvasinātu publisku personu un budžeta nefinansētu iestāžu budžetu ieņēmumi un izdevumi pa mēnešiem” resursiem pievienots automātisks XLSX imports:
+
+- EKK resurss `a8a020c0-cfad-4600-b506-a568f2fa60d4` — pārbaudītajā failā 91 728 datu rindas, 32 kolonnas.
+- FKK resurss `09a0ba1c-ce3f-4752-b35c-f3779137ae72` — pārbaudītajā failā 2533 datu rindas, 22 kolonnas.
+
+Poga “Izpētīt tabulu” atver no XLSX sagatavotu kopiju. Pieejama darblapas izvēle, gada, mēneša, ministrijas, iestādes, plāna/izpildes un citu avota klasifikāciju atlase. Meklēšana un “Visa atlase CSV” aptver visu izvēlēto darblapu. Tabulas lapā un diagrammā attēloti līdz 50 ierakstiem. Diagrammai izmanto `Summa`; kopsummas netiek rēķinātas, jo datu rindās var būt dažādi pārskatu un hierarhijas līmeņi. “#” ir saglabāts kā avota apzīmējums.
+
+XLSX kopijas tiek iegūtas katras veiksmīgas GitHub publicēšanas laikā, arī plānotajā ikdienas atjaunošanā. Laiks un oriģinālā resursa saite paliek redzami. Pārējie XLSX faili joprojām izmanto sākotnējo avota saiti; šis nav universāls visu Excel izkārtojumu lasītājs.
+
+Pilnai vietējai atjaunošanai: `npm run sync`. Tikai abu XLSX resursu atjaunošanai no pašreizējā kataloga: `npm run sync:xlsx`. Importam nepieciešams tikai Python standarta bibliotēku komplekts.
+
+Importētājs pārbauda nepieciešamās kolonnas, šūnu tipus, faila apjomu, saglabātās formulu vērtības un neskaidrus izkārtojumus. Ja kāds no abiem resursiem neizdodas, GitHub nepublicē nepilnu atjauninājumu; iepriekš publicētā vietne paliek pieejama. Tā ir apzināta izvēle pret klusu datu zaudēšanu.
+
+CSV saglabā kodu rakstību. Atverot CSV Excel, kodu kolonnām importēšanas dialogā jāizvēlas teksta tips, ja nepieciešams saglabāt sākuma nulles. Datu failu licences nemainās.
+
 ## Kas ir gatavs
 
 - Pārskats ar faktiskajiem kataloga rādītājiem un interaktīvu nozaru laukumu diagrammu.
@@ -73,9 +90,9 @@ Piegādes ZIP ietver darbībai nepieciešamo Latvijas kodu, pārņemto kodu un i
 
 - Sinhronizācija saņem visu pieejamo **publisko datu kopu katalogu**, nevis lejupielādē visu avota failu saturu. Portāla privāti vai nepublicēti dati nav ietverti.
 - Katalogs ir pilna kopija iegūšanas brīdī, nevis nepārtraukti sinhronizēta datubāze. Ja tiek pievienotas kopas, tās parādās pēc nākamās veiksmīgās atjaunošanas.
-- Datu kopu meklēšana notiek nosaukumos, aprakstos, publicētāju nosaukumos un atslēgvārdos. Tā nemeklē visos avota failos.
-- Datu kopas aktuālais apraksts un tabulas tiek pieprasītas tieši no `data.gov.lv`.
-- Tabulas skats darbojas resursiem ar `datastore_active=true`. CSV/XLSX/PDF/ZIP/WMS un citiem ārējiem resursiem bez DataStore pieejama avota saite. Šis rīks universāli neinterpretē visus failu tipus.
+- Kataloga datu kopu meklēšana notiek nosaukumos, aprakstos, publicētāju nosaukumos un atslēgvārdos. Tā nemeklē visos avota failos.
+- Datu kopas aktuālais apraksts un DataStore tabulas tiek pieprasītas tieši no `data.gov.lv`. Divas XLSX tabulas nolasa vietnes publicēšanas laikā sagatavotās kopijas.
+- Tabulas skats darbojas resursiem ar `datastore_active=true` un iepriekš norādītajām divām importētajām Valsts kases XLSX kopijām. Pārējiem CSV/XLSX/PDF/ZIP/WMS un citiem ārējiem resursiem bez DataStore pieejama avota saite. Šis rīks universāli neinterpretē visus failu tipus.
 - Vienā tabulas lapā tiek pieprasīti līdz 50 ierakstiem. Diagramma rāda tikai šo lapu un izvēlētās kolonnas, nevis visas datu kopas statistiku. Skaitliska kolonna var būt arī identifikators — tās nozīmi un mērvienību izvērtē lietotājs.
 - Nozaru laukumu diagramma rāda 8 lielākās klasificētās nozares. Vienai kopai var būt vairākas nozares; visu kopu kopskaits ir unikāls. Kopas bez norādītas nozares pieejamas katalogā ar atsevišķu filtru.
 - “Metadati atjaunoti” nav garantija, ka atjaunoti arī faila novērojumi.
