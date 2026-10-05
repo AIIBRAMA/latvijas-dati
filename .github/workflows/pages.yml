@@ -1,0 +1,46 @@
+name: Publicēt Latvijas datus
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+  schedule:
+    - cron: '23 4 * * *'
+permissions:
+  contents: read
+concurrency:
+  group: latvijas-dati-pages
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: npm ci --ignore-scripts
+      - run: npm test
+      # A failed sync fails this deployment, keeping the previously published site.
+      - run: npm run sync
+      - run: npm run build
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
