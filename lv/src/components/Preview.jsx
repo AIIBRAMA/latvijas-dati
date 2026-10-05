@@ -40,13 +40,17 @@ export default function Preview({resource}) {
     const points = useMemo(() => (displayed?.records || []).map((r) => ({label: String(r[xField] ?? ''), value: numeric(r[yField])})).filter((p) => p.value !== null), [displayed, xField, yField]);
     const low = Math.min(0, ...points.map((p) => p.value)), high = Math.max(0, ...points.map((p) => p.value)), span = high - low || 1;
     const zero = -low / span * 100;
+    function renderFilter({field, label, values}) {return <label key={field}>{label}<select value={filters[field] || ''} onChange={(e) => {setPage(0); setFilters({...filters, [field]: e.target.value});}}><option value="">Visas vērtības</option>{values.map((value) => <option key={value} value={value}>{value === '#' ? '# — avota apzīmējums' : value}</option>)}</select></label>;}
     function exportRows() {download('\uFEFF' + [fields.map((f) => f.id), ...displayed.records.map((r) => fields.map((f) => r[f.id]))].map((row) => row.map(csvCell).join(',')).join('\r\n'), `priekskatijums-${resource.id}-${currentPage + 1}.csv`);}
     return <section className="preview panel" aria-label="Resursa priekšskatījums">
         <div className="section-heading"><div><span className="eyebrow">{local ? 'NO XLSX SAGATAVOTA TABULA' : 'DATI NO AVOTA'}</span><h2>{resource.name || 'Tabulas priekšskatījums'}</h2></div></div>
         {local && workbook && <>
             <p className="caption">XLSX kopija iegūta {new Date(workbook.convertedAt).toLocaleString('lv-LV', {timeZone: 'Europe/Riga'})} pēc Latvijas laika. Avota rindas saglabātas bez summēšanas.</p>
             <label className="sheet-select">Darblapa<select value={sheetIndex} onChange={(e) => {setSheetIndex(Number(e.target.value)); setPage(0); setFilters({}); setX(''); setY('');}}>{workbook.sheets.map((s, i) => <option key={i} value={i}>{s.name} ({number(s.total)} rindas)</option>)}</select></label>
-            <details className="xlsx-filter-panel" open><summary>Atlasīt Valsts kases datus</summary><div className="xlsx-filters">{options.map(({field, label, values}) => <label key={field}>{label}<select value={filters[field] || ''} onChange={(e) => {setPage(0); setFilters({...filters, [field]: e.target.value});}}><option value="">Visas vērtības</option>{values.map((value) => <option key={value} value={value}>{value === '#' ? '# — avota apzīmējums' : value}</option>)}</select></label>)}</div><button className="text-button" onClick={() => {setFilters({}); setQuery(''); setDraft(''); setPage(0);}}>Notīrīt tabulas filtrus</button></details>
+            <div className="xlsx-filter-panel"><h3>Atlasīt datus</h3><div className="xlsx-filters">{options.filter(({field}) => ['Gads', 'Menesis_nr', 'Iestade', 'Klasifikacija'].includes(field)).map(renderFilter)}</div>
+                <details className="advanced-filters"><summary>Papildu filtri{Object.entries(filters).some(([field, value]) => value && !['Gads', 'Menesis_nr', 'Iestade', 'Klasifikacija'].includes(field)) ? ' · ir aktīvi filtri' : ''}</summary><div className="xlsx-filters">{options.filter(({field}) => !['Gads', 'Menesis_nr', 'Iestade', 'Klasifikacija'].includes(field)).map(renderFilter)}</div></details>
+                <button className="text-button" onClick={() => {setFilters({}); setQuery(''); setDraft(''); setPage(0);}}>Notīrīt tabulas filtrus</button>
+            </div>
             <p className="caption">Filtri, meklēšana un atlases CSV aptver visu izvēlēto darblapu. “#” saglabāts tieši no avota. Rindās var būt plāns, izpilde un dažādu līmeņu kopsummas — tās netiek automātiski saskaitītas.</p>
             {sheet?.cachedFormulaCount > 0 && <p className="caption">Formulām izmantotas avota failā saglabātās vērtības; vietne formulas nepārrēķina.</p>}
         </>}
