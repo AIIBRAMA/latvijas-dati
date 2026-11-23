@@ -8,6 +8,7 @@ import json
 import math
 import os
 import re
+import sys
 import time
 import urllib.parse
 import urllib.request
@@ -19,6 +20,16 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 DATASET = '8bd377ab-d7b4-4076-9898-f02d3f638144'
 RESOURCES = ('a8a020c0-cfad-4600-b506-a568f2fa60d4', '09a0ba1c-ce3f-4752-b35c-f3779137ae72')
+EKK_RESOURCE = RESOURCES[0]
+EKK_SHEET = 'DNAF_menesis_AD'
+EKK_HEADERS = (
+    'Gads', 'Menesis_nr', 'Menesis', 'Plans_gadam_uz_datumu', 'Min_kods', 'Ministrija',
+    'Augstaka_iestade_kods', 'Iest_kods', 'Iestade', 'Iestades_hier', 'Reg_nr', 'Veidlapa',
+    'Budzeta_tips', 'Pamatd_kons', 'Cons Code', 'Klasifikacija',
+    *(name for i in range(1, 8) for name in (f'EKK_kods_{i}_limenis', f'EKK_{i}_limenis')),
+    'Datu_valuta', 'Summa',
+)
+AG_HEADER = 'AG (avotā bez virsraksta)'
 NS = {'m': 'http://schemas.openxmlformats.org/spreadsheetml/2006/main'}
 REL = '{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id'
 # Menesis_nr also contains the source marker '#'; preserve it as a label.
@@ -96,7 +107,7 @@ def cell_value(cell, strings):
     return int(raw) if re.fullmatch(r'-?\d+', raw) else number
 
 
-def parse_xlsx(content):
+def parse_xlsx(content, *, resource_id=None):
     with zipfile.ZipFile(io.BytesIO(content)) as archive:
         if sum(info.file_size for info in archive.infolist()) > MAX_EXPANDED:
             raise ValueError('Expanded XLSX exceeds 256 MiB')
@@ -121,6 +132,8 @@ def parse_xlsx(content):
                 raise ValueError('Unexpected worksheet path')
             headers = None
             rows = []
+            unlabelled_ag = {}
+            reviewed_ag = False
             formula_count = 0
             with archive.open(path) as source:
                 for _, element in ET.iterparse(source, events=('end',)):
@@ -130,24 +143,41 @@ def parse_xlsx(content):
                     if tag != 'row':
                         continue
                     cells = {}
+                    formula_columns = set()
                     for cell in element.findall('m:c', NS):
                         index = col_index(cell.get('r', ''))
                         if index in cells:
                             raise ValueError('Duplicate cell reference')
                         cells[index] = cell_value(cell, strings)
-                        formula_count += cell.find('m:f', NS) is not None
+                        if cell.find('m:f', NS) is not None:
+                            formula_columns.add(index)
+                    formula_count += len(formula_columns)
                     element.clear()
                     if not any(v is not None and v != '' for v in cells.values()):
                         continue
                     if headers is None:
                         headers = [cells.get(i) for i in range(max(cells) + 1)]
+                        if (resource_id == EKK_RESOURCE and sheet.get('name') == EKK_SHEET
+                                and len(headers) == len(EKK_HEADERS) + 1 and headers[-1] in (None, '')
+                                and len(EKK_HEADERS) not in formula_columns):
+                            headers.pop()
                         if any(not isinstance(h, str) or not h.strip() for h in headers) or len(set(headers)) != len(headers):
                             raise ValueError('Headers must be non-empty, unique strings')
                         if not REQUIRED.issubset(headers):
                             raise ValueError('Treasury schema changed: required columns missing')
+                        reviewed_ag = (resource_id == EKK_RESOURCE and sheet.get('name') == EKK_SHEET
+                                       and tuple(headers) == EKK_HEADERS)
                         continue
-                    if any(i >= len(headers) and v is not None for i, v in cells.items()):
-                        raise ValueError('Data outside header columns')
+                    for index, value in cells.items():
+                        if index < len(headers) or value is None:
+                            continue
+                        # Official EKK export contains an unnamed AG with the marker 1.
+                        # Preserve it as text without attributing any business meaning.
+                        if (reviewed_ag and index == len(EKK_HEADERS) and index not in formula_columns
+                                and type(value) is int and value == 1):
+                            unlabelled_ag[len(rows)] = str(value)
+                        else:
+                            raise ValueError(f'Data outside header columns (sheet {sheet.get("name")}, column {index + 1}); manual review required')
                     values = []
                     for i, header in enumerate(headers):
                         value = cells.get(i)
@@ -167,6 +197,12 @@ def parse_xlsx(content):
                         raise ValueError('Worksheet exceeds supported row limit')
             if not headers or not rows:
                 raise ValueError('Empty worksheet; refusing an apparently successful empty import')
+            if unlabelled_ag:
+                headers.append(AG_HEADER)
+                for index, row in enumerate(rows):
+                    row.append(unlabelled_ag.get(index))
+                print(f'{resource_id}/{EKK_SHEET}: preserved {len(unlabelled_ag)} values from unlabelled column AG',
+                      file=sys.stderr, flush=True)
             fields = []
             for i, name in enumerate(headers):
                 field = {'id': name, 'type': 'number' if name in NUMERIC else 'text'}
@@ -209,7 +245,7 @@ def main():
         content = (args.source_dir / f'{resource_id}.xlsx').read_bytes() if args.source_dir else download(resource['url'])
         if len(content) > MAX_DOWNLOAD:
             raise ValueError('XLSX source exceeds size limit')
-        sheets = parse_xlsx(content)
+        sheets = parse_xlsx(content, resource_id=resource_id)
         sha = hashlib.sha256(content).hexdigest()
         # Schema prefix makes cache identity change if converter representation changes.
         name = f'{resource_id}-v1-{sha[:16]}.json'

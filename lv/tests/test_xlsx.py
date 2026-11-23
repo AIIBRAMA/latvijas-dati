@@ -12,19 +12,49 @@ spec.loader.exec_module(module)
 HEADERS = ['Gads', 'Menesis_nr', 'Iestade', 'Datu_valuta', 'Summa', 'Kods']
 
 
-def fixture(extra='', headers=None, amount='<v>-25</v>'):
+def fixture(extra='', headers=None, amount='<v>-25</v>', *, name='Budžets', overflow='', header_extra=''):
     headers = headers or HEADERS
-    cells = ''.join(f'<c r="{chr(65+i)}1" t="inlineStr"><is><t>{h}</t></is></c>' for i,h in enumerate(headers))
-    rows = f'<row r="1">{cells}</row><row r="2"><c r="A2"><v>2025</v></c><c r="B2" t="inlineStr"><is><t>#</t></is></c><c r="C2" t="inlineStr"><is><t>Rīgas iestāde</t></is></c><c r="D2" t="inlineStr"><is><t>EUR</t></is></c><c r="E2">{amount}</c><c r="F2" t="inlineStr"><is><t>001</t></is></c></row>'
+    def column(i):
+        return chr(65+i) if i < 26 else 'A' + chr(65+i-26)
+    cells = ''.join(f'<c r="{column(i)}1" t="inlineStr"><is><t>{h}</t></is></c>' for i,h in enumerate(headers))
+    if headers == module.EKK_HEADERS:
+        rows = (f'<row r="1">{cells}{header_extra}</row>'
+                '<row r="2"><c r="A2"><v>2026</v></c><c r="AF2"><v>23</v></c></row>'
+                f'<row r="3"><c r="A3"><v>2026</v></c><c r="AF3"><v>25</v></c>{overflow}</row>')
+    else:
+        rows = f'<row r="1">{cells}</row><row r="2"><c r="A2"><v>2025</v></c><c r="B2" t="inlineStr"><is><t>#</t></is></c><c r="C2" t="inlineStr"><is><t>Rīgas iestāde</t></is></c><c r="D2" t="inlineStr"><is><t>EUR</t></is></c><c r="E2">{amount}</c><c r="F2" t="inlineStr"><is><t>001</t></is></c>{overflow}</row>'
     memory = io.BytesIO()
     with zipfile.ZipFile(memory, 'w') as z:
-        z.writestr('xl/workbook.xml','<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Budžets" sheetId="1" r:id="rId1"/></sheets></workbook>')
+        z.writestr('xl/workbook.xml',f'<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="{name}" sheetId="1" r:id="rId1"/></sheets></workbook>')
         z.writestr('xl/_rels/workbook.xml.rels','<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Target="worksheets/sheet1.xml"/></Relationships>')
         z.writestr('xl/worksheets/sheet1.xml',f'<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>{rows}</sheetData>{extra}</worksheet>')
     return memory.getvalue()
 
 
 class ImportTests(unittest.TestCase):
+    def test_reviewed_ekk_column_preserves_marker_and_blank(self):
+        for header_extra in ('', '<c r="AG1"/>'):
+            with self.subTest(header_extra=header_extra):
+                source = fixture(headers=module.EKK_HEADERS, name=module.EKK_SHEET,
+                                 overflow='<c r="AG3"><v>1</v></c>', header_extra=header_extra)
+                sheet = module.parse_xlsx(source, resource_id=module.EKK_RESOURCE)[0]
+                self.assertEqual(sheet['fields'][-1], {
+                    'id': module.AG_HEADER, 'type': 'text', 'dictionary': ['1']})
+                self.assertEqual([row[-2:] for row in sheet['rows']], [[23, None], [25, 0]])
+
+    def test_other_orphan_values_and_resources_rejected(self):
+        variants = ['<c r="AG3"><v>2</v></c>', '<c r="AG3" t="b"><v>1</v></c>',
+                    '<c r="AG3"><f>1</f><v>1</v></c>', '<c r="AH3"><v>1</v></c>']
+        for overflow in variants:
+            with self.subTest(overflow=overflow), self.assertRaisesRegex(ValueError, 'outside header'):
+                module.parse_xlsx(fixture(headers=module.EKK_HEADERS, name=module.EKK_SHEET,
+                                          overflow=overflow), resource_id=module.EKK_RESOURCE)
+        with self.assertRaisesRegex(ValueError, 'outside header'):
+            module.parse_xlsx(fixture(headers=module.EKK_HEADERS, name=module.EKK_SHEET,
+                                      overflow='<c r="AG3"><v>1</v></c>'), resource_id=module.RESOURCES[1])
+        with self.assertRaisesRegex(ValueError, 'outside header'):
+            module.parse_xlsx(fixture(overflow='<c r="G2"><v>1</v></c>'), resource_id=module.EKK_RESOURCE)
+
     def test_values_and_markers(self):
         sheet = module.parse_xlsx(fixture())[0]
         self.assertEqual(sheet['total'],1)
