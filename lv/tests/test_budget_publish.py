@@ -227,10 +227,12 @@ class SyncEntrypointTests(unittest.TestCase):
         self.assertEqual(package['scripts']['sync:xlsx'], 'python3 lv/scripts/sync_xlsx.py')
         expected = ['lv/scripts/sync_catalog.py', 'lv/scripts/sync_xlsx.py',
                     'lv/scripts/publish_budget_estimates.py', 'lv/scripts/sync_annual_xlsx.py',
-                    'lv/scripts/sync_csv_preview.py', 'lv/scripts/sync_reviewed_xlsx.py', 'lv/scripts/sync_treasury_sheets.py']
+                    'lv/scripts/sync_csv_preview.py', 'lv/scripts/sync_reviewed_xlsx.py', 'lv/scripts/sync_treasury_sheets.py',
+                    'lv/scripts/sync_treasury_monthly.py']
         self.assertEqual(package['scripts']['sync:csv'], 'python3 lv/scripts/sync_csv_preview.py')
         self.assertIn('lv/scripts/sync_csv_preview.py --allow-standby', package['scripts']['sync'])
         self.assertIn("lv/scripts/sync_reviewed_xlsx.py --allow-standby", package["scripts"]["sync"])
+        self.assertIn("lv/scripts/sync_treasury_monthly.py --allow-standby", package["scripts"]["sync"])
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / 'package.json').write_text(json.dumps(package), encoding='utf-8')
@@ -239,9 +241,7 @@ class SyncEntrypointTests(unittest.TestCase):
                             'if [ "$1" = "$SYNC_TEST_FAIL" ]; then exit 17; fi\n', encoding='utf-8')
             fake.chmod(0o700)
             log = root / 'calls.txt'
-            for failure, called in [(expected[0], expected[:1]), (expected[1], expected[:2]),
-                                    (expected[2], expected[:3]), (expected[3], expected[:4]),
-                                    (expected[4], expected[:5]), (expected[5], expected[:6]), (expected[6], expected), ('', expected)]:
+            for failure, called in [(script, expected[:i + 1]) for i, script in enumerate(expected)] + [('', expected)]:
                 log.unlink(missing_ok=True)
                 env = {**os.environ, 'PATH': str(root) + os.pathsep + os.environ.get('PATH', ''),
                        'SYNC_TEST_LOG': str(log), 'SYNC_TEST_FAIL': failure}

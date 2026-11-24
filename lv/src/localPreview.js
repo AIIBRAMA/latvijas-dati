@@ -1,3 +1,4 @@
+import {monthlySheetName, monthlySheetList, validMonthlyWorkbook} from './treasuryMonthly.js';
 import {csvCell, normalize} from './data.js';
 
 export const FILTERS = [
@@ -23,6 +24,10 @@ export const FILTERS = [
     ['Budzeta_tips_nosaukums', 'Budžeta tips'], ['Vienotais_EKK_Atslega', 'EKK kods'],
     ['Menesis_nosaukums', 'Mēnesis'], ['Konsolidacija', 'Konsolidācijas griezums'],
     ['Vienotais_EKK_Atslega_8_limenis', 'EKK kods (8. līmenis)'],
+    ['Pasvaldiba_nosaukums', 'Pašvaldība'], ['Pasvaldiba_ATVK_kods', 'ATVK kods'],
+    ['Dati_datums', 'Pārskata datums'], ['Iestades_NMR', 'Iestādes reģistrācijas numurs'],
+    ['Budzeta_fin_plans_prognoze_gadam_uz_datumu', 'Gada plāns uz datumu'],
+    ['Budzeta_fin_plans_prognoze_gadam_versija_Atslega', 'Gada plāna versija'],
     ['Ceturksnis', 'Ceturksnis'], ['Ce-turksnis', 'Ceturksnis'], ['Mēnesis', 'Mēnesis (avota kods)'],
     ['Iepirkuma veids', 'Iepirkuma veids'], ['Pēc līgum-cenu sliekšņa', 'Pēc līgumcenu sliekšņa']
 ];
@@ -44,7 +49,9 @@ function treasurySheetPath(resource, sheet) {
     const preview = resource.local_preview;
     if (!isTreasurySheets(preview) || preview.sourceFormat !== 'XLSX' ||
         !/^[0-9a-f]{64}$/.test(preview.sourceSha256 ?? '') || !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(resource.id) ||
-        !Object.hasOwn(treasurySheetNames, sheet?.id) || sheet.name !== treasurySheetNames[sheet.id] ||
+        !sheet?.name || sheet.name !== (preview.reportProfile === undefined ?
+            (Object.hasOwn(treasurySheetNames, sheet.id) ? treasurySheetNames[sheet.id] : undefined) :
+            monthlySheetName(preview.reportProfile, sheet.id)) ||
         !/^[0-9a-f]{64}$/.test(sheet?.sha256 ?? '') ||
         sheet.path !== `data/treasury-sheets/${resource.id}-${sheet.id}-v1-${sheet.sha256}.json`) return null;
     return sheet.path;
@@ -53,6 +60,17 @@ export function localTreasurySheets(resource) {
     const preview = resource?.local_preview;
     if (!isTreasurySheets(preview)) return undefined;
     const sheets = preview.reportSheets;
+    if (preview.reportProfile !== undefined) {
+        const expected = monthlySheetList(preview);
+        if (!expected.length || !Array.isArray(sheets) || sheets.length !== expected.length) return [];
+        const byId = new Map(sheets.map((s) => [s?.id, s]));
+        const ordered = expected.map(({id, month}) => {
+            const entry = byId.get(id);
+            return entry && entry.month === month && treasurySheetPath(resource, entry) && Number.isSafeInteger(entry.total) &&
+                entry.total > 0 && entry.total <= 15000 ? entry : null;
+        });
+        return ordered.every(Boolean) && ordered.reduce((n, s) => n + s.total, 0) === preview.total ? ordered : [];
+    }
     if (!Array.isArray(sheets) || sheets.length !== 2 || sheets[0]?.id !== 'dati' || sheets[1]?.id !== 'ekk' ||
         sheets.some((s) => !treasurySheetPath(resource, s) || !Number.isSafeInteger(s.total) || s.total < 1 || s.total > 7200) ||
         sheets.reduce((n, s) => n + s.total, 0) !== preview.total) return [];
@@ -118,10 +136,18 @@ export function validateWorkbook(value, resource, partition, reportSheet) {
     if (isTreasurySheets(resource.local_preview)) {
         const preview = resource.local_preview;
         const sheet = value.sheets[0];
+        if (preview.reportProfile !== undefined) {
+            if (partition || !selectedTreasurySheetPath(resource, reportSheet) || !isTreasurySheets(value) ||
+                value.sourceFormat !== 'XLSX' || value.reportSheet !== reportSheet.id || value.convertedAt !== preview.convertedAt ||
+                !validMonthlyWorkbook(value, preview, reportSheet, cell)) {
+                throw new Error('Valsts kases tabula neatbilst atlasītajam avotam vai periodam.');
+            }
+            return value;
+        }
         const data = reportSheet?.id === 'dati';
         const ids = Array.isArray(sheet?.fields) ? sheet.fields.map((f) => f?.id) : [];
         const lexical = /^-?[0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]{1,2})?$/;
-        if (partition || !selectedTreasurySheetPath(resource, reportSheet) || !isTreasurySheets(value) ||
+        if (partition || value.reportProfile !== undefined || !selectedTreasurySheetPath(resource, reportSheet) || !isTreasurySheets(value) ||
             value.sourceFormat !== 'XLSX' || value.reportSheet !== reportSheet.id || value.convertedAt !== preview.convertedAt ||
             value.reportScope?.year !== preview.reportScope?.year || !/^[0-9]{4}$/.test(preview.reportScope?.year ?? '') ||
             value.sheets.length !== 1 || sheet?.name !== reportSheet.name || sheet?.total !== reportSheet.total ||
