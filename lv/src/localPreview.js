@@ -21,6 +21,8 @@ export const FILTERS = [
     ['Izdevumu_ekonomiskas_klasifikacijas_kods', 'Izdevumu klasifikācija'],
     ['Ministrija_nosaukums', 'Ministrija'], ['Iestade_nosaukums', 'Iestāde'],
     ['Budzeta_tips_nosaukums', 'Budžeta tips'], ['Vienotais_EKK_Atslega', 'EKK kods'],
+    ['Menesis_nosaukums', 'Mēnesis'], ['Konsolidacija', 'Konsolidācijas griezums'],
+    ['Vienotais_EKK_Atslega_8_limenis', 'EKK kods (8. līmenis)'],
     ['Ceturksnis', 'Ceturksnis'], ['Ce-turksnis', 'Ceturksnis'], ['Mēnesis', 'Mēnesis (avota kods)'],
     ['Iepirkuma veids', 'Iepirkuma veids'], ['Pēc līgum-cenu sliekšņa', 'Pēc līgumcenu sliekšņa']
 ];
@@ -36,6 +38,29 @@ export const isReviewedXlsx = (preview) => preview?.previewKind === 'treasury-re
 const february = '8c8ff425-d200-4a04-90c6-398508b8329b';
 const subtotalId = 'ee5889d5-e35e-46a0-beb2-3a317a9a64cd';
 const febMeasures = ['Finansesanas_plans_gadam_ar_izmainam', 'Ienemumi', 'Izdevumi', 'Finansesana'];
+export const isTreasurySheets = (preview) => preview?.previewKind === 'treasury-sheets-v1';
+const treasurySheetNames = {dati: 'DATI', ekk: 'EKK'};
+function treasurySheetPath(resource, sheet) {
+    const preview = resource.local_preview;
+    if (!isTreasurySheets(preview) || preview.sourceFormat !== 'XLSX' ||
+        !/^[0-9a-f]{64}$/.test(preview.sourceSha256 ?? '') || !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(resource.id) ||
+        !Object.hasOwn(treasurySheetNames, sheet?.id) || sheet.name !== treasurySheetNames[sheet.id] ||
+        !/^[0-9a-f]{64}$/.test(sheet?.sha256 ?? '') ||
+        sheet.path !== `data/treasury-sheets/${resource.id}-${sheet.id}-v1-${sheet.sha256}.json`) return null;
+    return sheet.path;
+}
+export function localTreasurySheets(resource) {
+    const preview = resource?.local_preview;
+    if (!isTreasurySheets(preview)) return undefined;
+    const sheets = preview.reportSheets;
+    if (!Array.isArray(sheets) || sheets.length !== 2 || sheets[0]?.id !== 'dati' || sheets[1]?.id !== 'ekk' ||
+        sheets.some((s) => !treasurySheetPath(resource, s) || !Number.isSafeInteger(s.total) || s.total < 1 || s.total > 7200) ||
+        sheets.reduce((n, s) => n + s.total, 0) !== preview.total) return [];
+    return sheets;
+}
+export function selectedTreasurySheetPath(resource, sheet) {
+    return localTreasurySheets(resource)?.includes(sheet) ? treasurySheetPath(resource, sheet) : null;
+}
 export function localPreviewPartitions(resource) {
     const preview = resource?.local_preview;
     const parts = preview?.partitions;
@@ -88,8 +113,36 @@ export function cell(sheet, row, index) {
     const value = row[index];
     return value === null || value === undefined ? null : sheet.fields[index].dictionary ? sheet.fields[index].dictionary[value] : value;
 }
-export function validateWorkbook(value, resource, partition) {
+export function validateWorkbook(value, resource, partition, reportSheet) {
     if (value?.schemaVersion !== 1 || value.resourceId !== resource.id || value.sourceUrl !== resource.local_preview.sourceUrl || value.sourceSha256 !== resource.local_preview.sourceSha256 || (value.sourceFormat != null && value.sourceFormat !== localSourceFormat(resource.local_preview)) || !Array.isArray(value.sheets) || !value.sheets.length) throw new Error('Datu kopija neatbilst izvēlētajam resursam. Pārlādējiet vietni.');
+    if (isTreasurySheets(resource.local_preview)) {
+        const preview = resource.local_preview;
+        const sheet = value.sheets[0];
+        const data = reportSheet?.id === 'dati';
+        const ids = Array.isArray(sheet?.fields) ? sheet.fields.map((f) => f?.id) : [];
+        const lexical = /^-?[0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]{1,2})?$/;
+        if (partition || !selectedTreasurySheetPath(resource, reportSheet) || !isTreasurySheets(value) ||
+            value.sourceFormat !== 'XLSX' || value.reportSheet !== reportSheet.id || value.convertedAt !== preview.convertedAt ||
+            value.reportScope?.year !== preview.reportScope?.year || !/^[0-9]{4}$/.test(preview.reportScope?.year ?? '') ||
+            value.sheets.length !== 1 || sheet?.name !== reportSheet.name || sheet?.total !== reportSheet.total ||
+            !Array.isArray(sheet?.rows) || sheet.rows.length !== reportSheet.total ||
+            ids.some((id) => typeof id !== 'string' || !id || id.length > 256) || new Set(ids).size !== ids.length ||
+            (data ? ids.length !== 32 || ids[0] !== 'Gads' || ids[1] !== 'Menesis_Atslega' ||
+                ids[30] !== 'Datu_valuta' || ids[31] !== 'Summa'
+                : JSON.stringify(ids) !== JSON.stringify(['EKK', 'Vienotais EKK - Key', 'EKK nosaukums'])) ||
+            sheet.fields.some((f, i) => f.type !== (data && i === 31 ? 'decimal' : 'text') ||
+                !Array.isArray(f.dictionary) || f.dictionary.length > sheet.total ||
+                f.dictionary.some((v) => typeof v !== 'string' || v.length > 4096 ||
+                    (f.type === 'decimal' && (v.length > 64 || !lexical.test(v))))) ||
+            sheet.rows.some((row) => !Array.isArray(row) || row.length !== ids.length ||
+                row.some((v, i) => v === null ? !data || [0, 1, 30, 31].includes(i) :
+                    !Number.isSafeInteger(v) || v < 0 || v >= sheet.fields[i].dictionary.length) ||
+                (data && (cell(sheet, row, 0) !== preview.reportScope.year ||
+                    !/^(?:[1-9]|1[0-2])$/.test(cell(sheet, row, 1)) || cell(sheet, row, 30) !== 'Euro')))) {
+            throw new Error('Valsts kases darblapa neatbilst atlasītajam pārskatam.');
+        }
+        return value;
+    }
     if (isReviewedXlsx(resource.local_preview)) {
         const preview = resource.local_preview;
         const sheet = value.sheets[0];
@@ -181,6 +234,13 @@ export function filterRows(sheet, filters = {}, query = '') {
     });
 }
 export function toRecords(sheet, rows) {return rows.map((row) => Object.fromEntries(sheet.fields.map((field, index) => [field.id, cell(sheet, row, index)])));}
+export function previewCsvCell(field, value) {
+    // An exact numeric lexeme cannot express a spreadsheet formula. Other text
+    // remains protected by csvCell, even when it begins with a minus sign.
+    if (field.type === 'decimal' && typeof value === 'string' && value.length <= 64 &&
+        /^-?[0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]{1,2})?$/.test(value)) return `"${value}"`;
+    return csvCell(value);
+}
 export function rowsCsv(sheet, rows) {
-    return '\uFEFF' + [sheet.fields.map((field) => csvCell(field.id)).join(','), ...rows.map((row) => sheet.fields.map((_, index) => csvCell(cell(sheet, row, index))).join(','))].join('\r\n');
+    return '\uFEFF' + [sheet.fields.map((field) => csvCell(field.id)).join(','), ...rows.map((row) => sheet.fields.map((field, index) => previewCsvCell(field, cell(sheet, row, index))).join(','))].join('\r\n');
 }
