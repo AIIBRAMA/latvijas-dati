@@ -8,3 +8,16 @@
 
 /* Compact resource descriptions and progressive filter disclosure. */
 .resource>div{min-width:0}.resource-description{margin:12px 0;color:var(--ink)}.resource-description summary,.advanced-filters summary{cursor:pointer;color:var(--green);font-size:13px;font-weight:600;padding:10px 0}.resource-description summary:focus-visible,.advanced-filters summary:focus-visible{outline:3px solid #b46720;outline-offset:3px}.resource-description[open]{padding-bottom:12px}.resource-description .caption{margin:8px 0}.glossary-scroll{overflow:auto;max-height:440px;border:1px solid var(--line);border-radius:6px;margin-top:10px}.glossary{width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed}.glossary th,.glossary td{padding:12px 14px;text-align:left;vertical-align:top;white-space:pre-line;overflow-wrap:anywhere;border-bottom:1px solid var(--line)}.glossary thead th{position:sticky;top:0;background:#edf1e9;z-index:1}.glossary th:first-child{width:34%}.glossary tbody th{font-weight:500;background:#f8f9f5}.glossary code{font-size:12px}.glossary tbody tr:last-child>*{border-bottom:0}.xlsx-filter-panel{border-radius:8px}.xlsx-filter-panel h3{font-size:15px;margin:0}.xlsx-filter-panel>.xlsx-filters{grid-template-columns:repeat(4,minmax(0,1fr))}.advanced-filters{border-top:1px solid var(--line);margin-bottom:10px}.advanced-filters .xlsx-filters{padding-top:8px}.resource-actions{align-self:start}.resource-description>p{white-space:pre-line}@media(max-width:760px){.xlsx-filter-panel>.xlsx-filters{grid-template-columns:repeat(2,minmax(0,1fr))}.glossary th,.glossary td{padding:10px;font-size:12px}.glossary th:first-child{width:42%}.glossary code{font-size:11px}}@media(max-width:400px){.xlsx-filter-panel>.xlsx-filters{grid-template-columns:1fr}}
+
+.iub-notices {margin: 0 0 2rem; overflow-wrap: anywhere}
+.iub-notices .data-stamp {display: block; margin: .5rem 0 1rem}
+.iub-notice-filters {display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.75rem; margin: 1rem 0}
+.iub-notice-filters label {display:grid; gap:.35rem; font-weight:600}
+.iub-notice-filters input {display:block; min-width:0; width:100%; padding:.55rem .65rem; border:1px solid var(--line); border-radius:.35rem; background:white; color:var(--ink)}
+.iub-notice-actions {grid-column:1/-1; display:flex; flex-wrap:wrap; gap:.65rem}
+.iub-notice-count {margin-top:1rem}
+.iub-notice-scroll {max-width:100%; overflow-x:auto}
+.iub-notice-scroll table {min-width:38rem}
+.iub-notice-scroll small {display:block; margin-top:.25rem; color:var(--muted)}
+.iub-notice-id {font-family:monospace}
+@media(max-width:650px){.iub-notice-filters {grid-template-columns:minmax(0,1fr)}}

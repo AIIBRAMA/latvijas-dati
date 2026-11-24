@@ -229,7 +229,7 @@ class SyncEntrypointTests(unittest.TestCase):
                     'lv/scripts/publish_budget_estimates.py', 'lv/scripts/sync_annual_xlsx.py',
                     'lv/scripts/sync_csv_preview.py', 'lv/scripts/sync_reviewed_xlsx.py', 'lv/scripts/sync_treasury_sheets.py',
                     'lv/scripts/sync_treasury_monthly.py', 'lv/scripts/sync_other_csv.py', 'lv/scripts/sync_first_preview.py',
-                    'lv/scripts/sync_second_preview.py']
+                    'lv/scripts/sync_second_preview.py', 'lv/scripts/sync_iub_notices.py']
         self.assertEqual(package['scripts']['sync:csv'], 'python3 lv/scripts/sync_csv_preview.py')
         self.assertIn('lv/scripts/sync_csv_preview.py --allow-standby', package['scripts']['sync'])
         self.assertIn("lv/scripts/sync_reviewed_xlsx.py --allow-standby", package["scripts"]["sync"])
