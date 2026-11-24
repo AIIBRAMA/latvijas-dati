@@ -1,4 +1,4 @@
-"""Import two reviewed Treasury XLSX resources into typed, dictionary-encoded JSON.
+"""Import four reviewed Treasury XLSX resources into typed, dictionary-encoded JSON.
 Standard-library only; no formulas are executed. Reject changed/ambiguous layouts.
 """
 import argparse
@@ -9,6 +9,7 @@ import math
 import os
 import re
 import sys
+import tempfile
 import time
 import urllib.parse
 import urllib.request
@@ -19,7 +20,14 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 DATASET = '8bd377ab-d7b4-4076-9898-f02d3f638144'
-RESOURCES = ('a8a020c0-cfad-4600-b506-a568f2fa60d4', '09a0ba1c-ce3f-4752-b35c-f3779137ae72')
+MUNICIPAL_DATASET = 'e2b111ec-c2ad-4525-937e-c28f07af62c9'
+MUNICIPAL_EKK = '9ac53f2c-88dc-4f54-9871-36ddc5e0af84'
+MUNICIPAL_FKK = 'd7c4897d-33f6-4885-9cd1-c3abe0f47f69'
+RESOURCE_GROUPS = {
+    DATASET: ('a8a020c0-cfad-4600-b506-a568f2fa60d4', '09a0ba1c-ce3f-4752-b35c-f3779137ae72'),
+    MUNICIPAL_DATASET: (MUNICIPAL_EKK, MUNICIPAL_FKK),
+}
+RESOURCES = tuple(resource_id for group in RESOURCE_GROUPS.values() for resource_id in group)
 EKK_RESOURCE = RESOURCES[0]
 EKK_SHEET = 'DNAF_menesis_AD'
 EKK_HEADERS = (
@@ -30,6 +38,18 @@ EKK_HEADERS = (
     'Datu_valuta', 'Summa',
 )
 AG_HEADER = 'AG (avotā bez virsraksta)'
+MUNICIPAL_COMMON = (
+    'Gads', 'Menesis_nr', 'Menesis', 'Plans_gadam_uz_datumu', 'Novadi_pilsetas', 'ATVK',
+    'Iestades_hier', 'Veidlapa', 'Budzeta_tips', 'Pamatd_kons', 'Cons_Code', 'Klasifikacija',
+)
+MUNICIPAL_LAYOUTS = {
+    MUNICIPAL_EKK: ('Pasvaldibas_menesis_AD', (*MUNICIPAL_COMMON,
+        *(name for i in range(1, 8) for name in (f'EKK_kods_{i}_limenis', f'EKK_{i}_limenis')),
+        'Valuta', 'Summa')),
+    MUNICIPAL_FKK: ('Pasvaldibas_menesis_funkc_AD', (*MUNICIPAL_COMMON,
+        'EKK_kods_1_limenis', 'EKK_1_limenis', 'Funkcija_kods_1_limenis', 'Funkcija_1_limenis',
+        'Valuta', 'Summa')),
+}
 NS = {'m': 'http://schemas.openxmlformats.org/spreadsheetml/2006/main'}
 REL = '{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id'
 # Menesis_nr also contains the source marker '#'; preserve it as a label.
@@ -122,7 +142,12 @@ def parse_xlsx(content, *, resource_id=None):
         rels = ET.fromstring(archive.read('xl/_rels/workbook.xml.rels'))
         targets = {r.get('Id'): r.get('Target') for r in rels if r.get('TargetMode') != 'External'}
         sheets = []
-        for sheet in workbook.find('m:sheets', NS):
+        workbook_sheets = workbook.find('m:sheets', NS)
+        municipal = MUNICIPAL_LAYOUTS.get(resource_id)
+        if municipal and (workbook_sheets is None or len(workbook_sheets) != 1
+                          or workbook_sheets[0].get('name') != municipal[0]):
+            raise ValueError('Municipal Treasury worksheet layout changed; manual review required')
+        for sheet in workbook_sheets:
             # Do not silently skip hidden sheets in a reviewed source.
             if sheet.get('state', 'visible') != 'visible':
                 raise ValueError('Hidden worksheet found; manual review required')
@@ -163,7 +188,9 @@ def parse_xlsx(content, *, resource_id=None):
                             headers.pop()
                         if any(not isinstance(h, str) or not h.strip() for h in headers) or len(set(headers)) != len(headers):
                             raise ValueError('Headers must be non-empty, unique strings')
-                        if not REQUIRED.issubset(headers):
+                        if municipal and tuple(headers) != municipal[1]:
+                            raise ValueError('Municipal Treasury column layout changed; manual review required')
+                        if not municipal and not REQUIRED.issubset(headers):
                             raise ValueError('Treasury schema changed: required columns missing')
                         reviewed_ag = (resource_id == EKK_RESOURCE and sheet.get('name') == EKK_SHEET
                                        and tuple(headers) == EKK_HEADERS)
@@ -236,36 +263,51 @@ def main():
     args = parser.parse_args()
     catalog_path = ROOT / 'public/data/catalog.json'
     catalog = json.loads(catalog_path.read_text(encoding='utf-8'))
-    dataset = next(d for d in catalog['datasets'] if d['id'] == DATASET)
-    by_id = {r['id']: r for r in dataset['resources']}
+    datasets = {d['id']: d for d in catalog['datasets']}
+    by_id = {}
+    for dataset_id, resource_ids in RESOURCE_GROUPS.items():
+        dataset = datasets.get(dataset_id)
+        if dataset is None:
+            raise ValueError(f'Reviewed Treasury dataset missing: {dataset_id}')
+        available = {resource['id']: resource for resource in dataset['resources']}
+        for resource_id in resource_ids:
+            if resource_id not in available:
+                raise ValueError(f'Reviewed Treasury resource missing: {dataset_id}/{resource_id}')
+            by_id[resource_id] = available[resource_id]
     pending = []
-    for resource_id in RESOURCES:
-        resource = by_id[resource_id]
-        trusted_url(resource['url'])
-        content = (args.source_dir / f'{resource_id}.xlsx').read_bytes() if args.source_dir else download(resource['url'])
-        if len(content) > MAX_DOWNLOAD:
-            raise ValueError('XLSX source exceeds size limit')
-        sheets = parse_xlsx(content, resource_id=resource_id)
-        sha = hashlib.sha256(content).hexdigest()
-        # Schema prefix makes cache identity change if converter representation changes.
-        name = f'{resource_id}-v1-{sha[:16]}.json'
-        converted_at = datetime.now(timezone.utc).isoformat()
-        payload = {'schemaVersion': 1, 'resourceId': resource_id, 'sourceUrl': resource['url'],
-                   'sourceSha256': sha, 'convertedAt': converted_at, 'sheets': sheets}
-        output = ROOT / 'public/data/xlsx' / name
-        atomic_json(output, payload)
-        if output.stat().st_size > 24 * 1024 * 1024:
-            raise ValueError('Converted file too large for browser upload; partitioning required')
-        pending.append((resource, {'path': 'data/xlsx/' + name, 'sourceUrl': resource['url'],
-                                  'sourceSha256': sha, 'convertedAt': converted_at,
-                                  'total': sum(s['total'] for s in sheets)}))
-        print(f'{resource_id}: {len(sheets)} sheets, {sum(s["total"] for s in sheets)} rows, {output.stat().st_size} JSON bytes', flush=True)
-    for resource, preview in pending:
-        resource['local_preview'] = preview
-    atomic_json(catalog_path, catalog)
+    output_dir = ROOT / 'public/data/xlsx'
+    with tempfile.TemporaryDirectory(prefix='.xlsx-stage-', dir=catalog_path.parent) as staging:
+        for resource_id in RESOURCES:
+            resource = by_id[resource_id]
+            trusted_url(resource['url'])
+            content = (args.source_dir / f'{resource_id}.xlsx').read_bytes() if args.source_dir else download(resource['url'])
+            if len(content) > MAX_DOWNLOAD:
+                raise ValueError('XLSX source exceeds size limit')
+            sheets = parse_xlsx(content, resource_id=resource_id)
+            sha = hashlib.sha256(content).hexdigest()
+            # Schema prefix makes cache identity change if converter representation changes.
+            name = f'{resource_id}-v1-{sha[:16]}.json'
+            converted_at = datetime.now(timezone.utc).isoformat()
+            payload = {'schemaVersion': 1, 'resourceId': resource_id, 'sourceUrl': resource['url'], 'sourceFormat': 'XLSX',
+                       'sourceSha256': sha, 'convertedAt': converted_at, 'sheets': sheets}
+            output = Path(staging) / name
+            atomic_json(output, payload)
+            size = output.stat().st_size
+            if size > 24 * 1024 * 1024:
+                raise ValueError('Converted file too large for browser upload; partitioning required')
+            total = sum(s['total'] for s in sheets)
+            pending.append((resource, {'path': 'data/xlsx/' + name, 'sourceUrl': resource['url'], 'sourceFormat': 'XLSX',
+                                      'sourceSha256': sha, 'convertedAt': converted_at, 'total': total}))
+            print(f'{resource_id}: {len(sheets)} sheets, {total} rows, {size} JSON bytes', flush=True)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        for resource, preview in pending:
+            name = Path(preview['path']).name
+            os.replace(Path(staging) / name, output_dir / name)
+            resource['local_preview'] = preview
+        atomic_json(catalog_path, catalog)
     # Catalog is replaced only after every required source passed conversion.
     keep = {Path(p['path']).name for _, p in pending}
-    for path in (ROOT / 'public/data/xlsx').glob('*.json'):
+    for path in output_dir.glob('*.json'):
         if path.name not in keep:
             path.unlink()
 

@@ -1,3 +1,33 @@
+# Papildinājuma pārbaudes — 2026-11-24
+
+## Reālo publisko avotu pārveidošana
+
+- Pilnais Valsts budžeta tāmju JSON avots: **208 027 386 baiti, 236 015 rindas, 25 kolonnas**. Nav lietots gada filtrs.
+- Pilnā avota SHA-256: `2b384a78d4c655d48c67401d4234ec6e561ffb7e4a5509c028a68dc49302ca05`.
+- Gadi iegūti dinamiski no visām rindām: **2025 — 137 991**, **2026 — 98 024**; summa sakrīt ar pilnā avota rindu skaitu.
+- Publicēšanas kopijas: 2025. gada fails **10 122 263 baiti**, 2026. gada fails **7 173 173 baiti**. Kopā **17 295 436 baiti**, katrs zem 24 MiB limita. Katrā kopijā vārdnīcas satur tikai attiecīgajā gadā lietotos tekstus.
+- Četras XLSX kopijas: atvasināto iestāžu EKK **100 753 × 33**, funkcijas **2793 × 22**; pašvaldību EKK **151 309 × 28**, funkcijas **54 581 × 18**.
+- Bezsaistes pārveidošana ar precīzi lejupielādētajiem pilnajiem avotiem un `npm run build` veiksmīga. Šie skaiti attiecas uz konkrētajiem pārbaudītajiem avotiem, ne nākamām atjaunošanām.
+
+## Automātiskās pārbaudes
+
+- `python3 -m unittest discover -s lv/tests -p 'test_*.py'`: **32/32** pārbaudes veiksmīgas.
+- `npm test`: **16/16** JavaScript pārbaudes veiksmīgas.
+- JSON publicēšanas robežai ir 16 pārbaudes: visu gadu un rindu saglabāšana, null/0/negatīvu summu un sākuma nulles kodu saglabāšana, vārdnīcu sablīvēšana, precīza avota URL atbilstība, failu izmēri, dublēti kataloga mērķi, bezsaistes CLI un atomiska faila nomaiņa.
+- Pārbaudīta neveiksme pēc pirmā gada faila sagatavošanas, otram gadam pārsniedzot limitu: katalogs un vecās kopijas nemainās, jaunais neatsauktais fails tiek noņemts.
+- Pārbaudīta kataloga ierakstīšanas kļūda un atkārtota tā paša avota pārveidošana: iepriekšējās publicēšanas kopijas netiek pārrakstītas vai izdzēstas. Neatbilstoša saglabātā kopija tiek noraidīta.
+- Īstais `npm run sync` komandas ceļš izpildīts ar aizvietotu Python ārējo robežu: kataloga, XLSX vai JSON kļūda atgriež nenulles statusu, un nākamie soļi netiek sākti. `npm run sync:xlsx` paliek tā pati atsevišķā XLSX komanda.
+- Pārbaudīts, ka Pages darbplūsmā sinhronizācija ir pirms būvēšanas/artefakta augšupielādes, nav `continue-on-error`, un izvēršana ir atkarīga no veiksmīgas būvēšanas. CI konfigurāciju šim papildinājumam nebija nepieciešams vājināt vai mainīt.
+- JavaScript pārbaudes aptver viena gada izvēli, visjaunākā gada noklusējumu, sajauktu gadu/kopiju identitāšu noraidīšanu, precīzus atlases apjomus un JSON mērvienības neizdomāšanu.
+
+## Robežas
+
+Pilnas GitHub Actions palaišanas un publiski izvērstās vietnes rezultāts ir atsevišķa publicēšanas pārbaude. Iepriekš minētie testi to neaizstāj. Ja avots vēlāk pārsniedz izmēra/rindu limitu, nomaina shēmu vai pārtrauc atbildēt, atjaunošana apstājas, saglabājot iepriekš publicēto vietni.
+
+Tālāk saglabāti agrāko piegāžu vēsturiskie pārbaudes protokoli. Tajos minētie datumi, rindu skaiti un toreiz nepārbaudītās publicēšanas darbības neapraksta šī papildinājuma pašreizējo stāvokli.
+
+---
+
 # Atjauninājuma 1.1 pārbaudes — 2026-10-05
 
 - Abi XLSX faili saņemti no norādītajiem data.gov.lv resursiem.

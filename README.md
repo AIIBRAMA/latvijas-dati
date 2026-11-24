@@ -2,22 +2,40 @@
 
 Latviska atvērto datu izpētes vietne, pielāgota no [USAspending](https://github.com/fedspendingtransparency/usaspending-website) idejas un atvērtā koda komponentēm. Avots: [Latvijas Atvērto datu portāls](https://data.gov.lv/lv).
 
-## Atjauninājums 1.1 — Valsts kases XLSX tabulas
+## Papildinājums — Valsts budžeta tāmes un pašvaldību mēneša tabulas
 
-Diviem datu kopas “No valsts budžeta daļēji finansētu atvasinātu publisku personu un budžeta nefinansētu iestāžu budžetu ieņēmumi un izdevumi pa mēnešiem” resursiem pievienots automātisks XLSX imports:
+Atbalstīti pieci pārbaudīti Valsts kases resursi trijās datu kopās:
 
-- EKK resurss `a8a020c0-cfad-4600-b506-a568f2fa60d4` — pārbaudītajā failā 91 728 datu rindas, 32 kolonnas.
-- FKK resurss `09a0ba1c-ce3f-4752-b35c-f3779137ae72` — pārbaudītajā failā 2533 datu rindas, 22 kolonnas.
+- **Valsts budžeta tāmes**, JSON resurss `45368057-dfd7-4c56-9cac-5ca0e22ca086`. Pilnais publiskais avots pārveidots tabulā, saglabājot visus tajā pieejamos gadus. Pārbaudītajā 2026-11-24 kopijā: 236 015 rindas, no tām 2025. gadā 137 991 un 2026. gadā 98 024. Pārlūks ielādē vienu izvēlēto gadu, sākot ar jaunāko. Tas nav tikai jaunākā gada izgriezums no avota.
+- **Pašvaldību budžetu ieņēmumi un izdevumi pa mēnešiem**, EKK resurss `9ac53f2c-88dc-4f54-9871-36ddc5e0af84` un funkciju resurss `d7c4897d-33f6-4885-9cd1-c3abe0f47f69`. Pārbaudītajās XLSX kopijās: 151 309 × 28 un 54 581 × 18 datu rindas/kolonnas.
+- **No valsts budžeta daļēji finansētu atvasinātu publisku personu un budžeta nefinansētu iestāžu mēneša tabulas**, jau atbalstītie EKK `a8a020c0-cfad-4600-b506-a568f2fa60d4` un funkciju `09a0ba1c-ce3f-4752-b35c-f3779137ae72` resursi. Aktuālajā pārbaudē: 100 753 × 33 un 2793 × 22. EKK avota AG kolonnai nav virsraksta; tās marķieri saglabāti ar skaidru tehnisku nosaukumu, neizdomājot biznesa nozīmi.
 
-Poga “Izpētīt tabulu” atver no XLSX sagatavotu kopiju. Pieejama darblapas izvēle, gada, mēneša, ministrijas, iestādes, plāna/izpildes un citu avota klasifikāciju atlase. Meklēšana un “Visa atlase CSV” aptver visu izvēlēto darblapu. Tabulas lapā un diagrammā attēloti līdz 50 ierakstiem. Diagrammai izmanto `Summa`; kopsummas netiek rēķinātas, jo datu rindās var būt dažādi pārskatu un hierarhijas līmeņi. “#” ir saglabāts kā avota apzīmējums.
+Šie skaiti raksturo pārbaudīto kopiju, ne nemainīgu avota izmēru. Datu kopu apraksti un licences saglabājas katalogā. [Tāmju katalogs](https://data.gov.lv/dati/lv/dataset/valsts-budzeta-tames), [pašvaldību katalogs](https://data.gov.lv/dati/dataset/e2b111ec-c2ad-4525-937e-c28f07af62c9).
 
-XLSX kopijas tiek iegūtas katras veiksmīgas GitHub publicēšanas laikā, arī plānotajā ikdienas atjaunošanā. Laiks un oriģinālā resursa saite paliek redzami. Pārējie XLSX faili joprojām izmanto sākotnējo avota saiti; šis nav universāls visu Excel izkārtojumu lasītājs.
+### Izpēte un datu nozīme
 
-Pilnai vietējai atjaunošanai: `npm run sync`. Tikai abu XLSX resursu atjaunošanai no pašreizējā kataloga: `npm run sync:xlsx`. Importam nepieciešams tikai Python standarta bibliotēku komplekts.
+Poga “Skatīt tabulu” atver publicēšanas laikā sagatavoto kopiju. Pieejama darblapas izvēle un attiecīgajā avotā esošie gada, mēneša, pašvaldības/iestādes, plāna/izpildes, ministrijas, tāmes un klasifikāciju filtri. Meklēšana un CSV eksports (“Visa atlase CSV” XLSX tabulām, “Gada atlase CSV” tāmēm) aptver visu izvēlēto darblapu; tāmēm tā ir **izvēlētā gada** darblapa, ne visi gadi vienlaikus. Tabulas lapā un diagrammā attēloti līdz 50 ierakstiem.
 
-Importētājs pārbauda nepieciešamās kolonnas, šūnu tipus, faila apjomu, saglabātās formulu vērtības un neskaidrus izkārtojumus. Ja kāds no abiem resursiem neizdodas, GitHub nepublicē nepilnu atjauninājumu; iepriekš publicētā vietne paliek pieejama. Tā ir apzināta izvēle pret klusu datu zaudēšanu.
+Diagramma lieto `Summa`. Kopsummas netiek rēķinātas, jo rindās var pārklāties pārskatu un hierarhijas līmeņi. Tāmju avots nenorāda atsevišķu valūtas kolonnu, tādēļ vietne nepieņem mērvienību pati. Tukša summa tiek saglabāta kā trūkstoša vērtība, ne nulle; īstā nulle un negatīvas summas paliek skaitļi. Avota kodi, sākuma nulles, “#” un teksta vērtības netiek interpretētas kā maksājumi vai klasifikatoru secinājumi.
 
-CSV saglabā kodu rakstību. Atverot CSV Excel, kodu kolonnām importēšanas dialogā jāizvēlas teksta tips, ja nepieciešams saglabāt sākuma nulles. Datu failu licences nemainās.
+CSV saglabā kodu rakstību un neitralizē formulas. Atverot CSV Excel, kodu kolonnām importēšanas dialogā izvēlieties teksta tipu, ja nepieciešams saglabāt sākuma nulles.
+
+### Atjaunošana un droša publicēšana
+
+- `npm run sync`: vispirms publiskais katalogs, pēc tam visi četri pārbaudītie XLSX resursi un pilnais tāmju JSON avots.
+- `npm run sync:xlsx`: tāpat kā iepriekš palaiž tikai XLSX importētāju no pašreizējā kataloga; tā tvērums tagad ir četri resursi.
+- `npm run sync:budget`: tikai tāmju JSON pārveidošana no pašreizējā kataloga.
+- Atkārtojamai bezsaistes pārbaudei: `python3 lv/scripts/sync_xlsx.py --source-dir MAPES_CELS` un `python3 lv/scripts/publish_budget_estimates.py --source-dir MAPES_CELS`. Failu nosaukumi ir precīzs resursa UUID ar `.xlsx` vai `.json` paplašinājumu. JSON failam jābūt pilnam, ne pēc gada filtrētam avotam.
+
+Importam vajadzīga tikai Python standarta bibliotēka. Tāmju avots tiek pieprasīts tikai no pārbaudītā pilnā `https://opendata.kase.gov.lv/api/v1/valsts_budzeta_tames` galapunkta. Avota gada saraksts tiek noteikts no visām saņemtajām rindām, ne ievadīts kodā. Katram gadam publicē atsevišķu `data/json/<UUID>-v1-<SHA16>-<GADS>.json` failu. Visiem gadiem kopīga pilnā avota SHA-256; vārdnīcas katrā gadā sablīvē, nezaudējot rindas. Katalogā `local_preview.sourceFormat` ir `JSON`, bet `partitions` norāda gadu failus un precīzus rindu skaitus. Darblapas saglabā vienoto `schemaVersion: 1` formātu.
+
+Avota JSON izmēra limits ir 384 MiB, rindu limits 400 000, viena gada pārlūka kopijas limits 24 MiB. Pārsniegums, mainīta shēma vai nepilns avots aptur atjaunošanu, nevis klusi izlaiž rindas. Pašreizējie divi gadu faili aizņem aptuveni 10,12 MB un 7,17 MB.
+
+JSON importētājs nomaina kataloga atsauces tikai pēc visu gadu veiksmīgas konvertēšanas. Kļūdas gadījumā tas saglabā iepriekšējo katalogu un failus; jaunus, vēl neatsauktus failus noņem. Atkārtoti izmanto tikai pārbaudītas tā paša satura kopijas. Vienā lokālajā projekta mapē palaidiet tikai vienu sinhronizāciju vienlaikus.
+
+GitHub Pages jau izpilda abus testu komplektus un `npm run sync` pirms būvēšanas un augšupielādes. Ja kāds avots vai konvertētājs neizdodas, jaunā vietne netiek publicēta; iepriekš publicētā vietne paliek pieejama. Lokāli `npm run sync` sastāv no secīgiem soļiem: pēc vēlākas kļūdas agrākais kataloga/XLSX solis var jau būt atjaunots. Pirms lokālas publicēšanas jāsagaida veiksmīgs **visas** sinhronizācijas rezultāts, ne jāturpina pēc kļūdas.
+
+Pārējie XLSX/JSON un citi ārējie resursi bez DataStore izmanto avota saiti. Šis nav universāls visu Excel izkārtojumu vai JSON API lasītājs.
 
 ## Kas ir gatavs
 
@@ -61,12 +79,12 @@ Atveriet terminālī norādīto `http://127.0.0.1:5173`. Pirmreizējai palaišan
 
 ```sh
 npm test          # atlases, eksporta un datu interpretācijas pārbaudes
-npm run sync      # iegūst aktuālo publisko katalogu
+npm run sync      # katalogs, četri XLSX resursi un pilnas Valsts budžeta tāmes
 npm run build     # sagatavo statisko vietni dist/ mapē
 npm run preview   # pārbauda sagatavoto vietni
 ```
 
-Windows datorā, ja komanda `python3` nav pieejama, palaidiet `py lv/scripts/sync_catalog.py`.
+Windows datorā, ja komanda `python3` nav pieejama, izmantojiet `py` attiecīgā skripta priekšā. Pilnai atjaunošanai secīgi palaidiet `sync_catalog.py`, `sync_xlsx.py` un `publish_budget_estimates.py` no `lv/scripts/`; turpiniet tikai tad, ja iepriekšējais solis beidzies bez kļūdas.
 
 Ar dubultklikšķi atvērts HTML (`file://`) nav paredzēts izmantošanai: izmantojiet vietējo serveri vai GitHub Pages.
 
@@ -91,8 +109,8 @@ Piegādes ZIP ietver darbībai nepieciešamo Latvijas kodu, pārņemto kodu un i
 - Sinhronizācija saņem visu pieejamo **publisko datu kopu katalogu**, nevis lejupielādē visu avota failu saturu. Portāla privāti vai nepublicēti dati nav ietverti.
 - Katalogs ir pilna kopija iegūšanas brīdī, nevis nepārtraukti sinhronizēta datubāze. Ja tiek pievienotas kopas, tās parādās pēc nākamās veiksmīgās atjaunošanas.
 - Kataloga datu kopu meklēšana notiek nosaukumos, aprakstos, publicētāju nosaukumos un atslēgvārdos. Tā nemeklē visos avota failos.
-- Datu kopas aktuālais apraksts un DataStore tabulas tiek pieprasītas tieši no `data.gov.lv`. Divas XLSX tabulas nolasa vietnes publicēšanas laikā sagatavotās kopijas.
-- Tabulas skats darbojas resursiem ar `datastore_active=true` un iepriekš norādītajām divām importētajām Valsts kases XLSX kopijām. Pārējiem CSV/XLSX/PDF/ZIP/WMS un citiem ārējiem resursiem bez DataStore pieejama avota saite. Šis rīks universāli neinterpretē visus failu tipus.
+- Datu kopas aktuālais apraksts un DataStore tabulas tiek pieprasītas tieši no `data.gov.lv`. Četri pārbaudītie XLSX resursi un Valsts budžeta tāmes nolasa vietnes publicēšanas laikā sagatavotās kopijas.
+- Tabulas skats darbojas resursiem ar `datastore_active=true` un iepriekš norādītajiem četriem importētajiem Valsts kases XLSX resursiem un tāmju JSON gadu kopijām. Pārējiem CSV/XLSX/PDF/ZIP/WMS un citiem ārējiem resursiem bez DataStore pieejama avota saite. Šis rīks universāli neinterpretē visus failu tipus.
 - Vienā tabulas lapā tiek pieprasīti līdz 50 ierakstiem. Diagramma rāda tikai šo lapu un izvēlētās kolonnas, nevis visas datu kopas statistiku. Skaitliska kolonna var būt arī identifikators — tās nozīmi un mērvienību izvērtē lietotājs.
 - Nozaru laukumu diagramma rāda 8 lielākās klasificētās nozares. Vienai kopai var būt vairākas nozares; visu kopu kopskaits ir unikāls. Kopas bez norādītas nozares pieejamas katalogā ar atsevišķu filtru.
 - “Metadati atjaunoti” nav garantija, ka atjaunoti arī faila novērojumi.
@@ -102,7 +120,10 @@ Piegādes ZIP ietver darbībai nepieciešamo Latvijas kodu, pārņemto kodu un i
 
 - React un Vite; D3 tikai laukumu diagrammas izkārtojumam.
 - `lv/scripts/sync_catalog.py`: lapota `package_search` iegūšana, publisko ierakstu normalizācija, kopskaita pārbaude un atomiska faila nomaiņa. Kļūdas gadījumā nepilns katalogs netiek publicēts.
-- `lv/public/data/catalog.json`: publiskie metadati un pēdējās iegūšanas laiks.
+- `lv/scripts/sync_xlsx.py`: četru pārbaudīto XLSX resursu pārveidošana vienotā tabulu formātā.
+- `lv/scripts/sync_budget_estimates.py`: pilna tāmju JSON avota ierobežota lejupielāde un pārbaudītās shēmas lasīšana.
+- `lv/scripts/publish_budget_estimates.py`: tāmju sadalīšana pa gadiem, izmēru kontrole un atomiska kataloga atsauču nomaiņa.
+- `lv/public/data/catalog.json`: publiskie metadati, pēdējās iegūšanas laiks un pārbaudīto vietējo kopiju atsauces.
 - `lv/src/api.js`: CKAN dokumentētais JSONP publiskām GET darbībām. Pārbaudīts, jo avots neatgrieza CORS atļauju parastajam pārlūka `fetch`. Tas ļauj izmantot GitHub Pages bez starpniekservera.
 - JSONP izpilda atbildi kā skriptu: uzticamā izcelsme ir fiksēta `https://data.gov.lv`; atļautas tikai `package_show` un `datastore_search`. Lietotājs nevar nomainīt izcelsmi vai ielādēt patvaļīgu skripta adresi. Ja nevēlaties uzticēties JSONP, nākamais arhitektūras solis ir sava servera tikai lasāms API starpnieks.
 - Nav API atslēgu, analītikas, servera lietotāju kontu vai lietotāju datu glabāšanas. Saglabātās kopas ir `localStorage`.
