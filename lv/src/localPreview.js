@@ -37,6 +37,7 @@ export const PRIMARY_FILTERS = {
     CSV: ['Gads', 'Mēnesis', 'Iepirkuma veids']
 };
 export const localSourceFormat = (preview) => preview?.sourceFormat ?? 'XLSX';
+export const isPublicXlsx = (preview) => preview?.previewKind === 'public-reviewed-xlsx-v1';
 export const isAnnualPreview = (preview) => preview?.previewKind === 'treasury-annual-v1';
 
 export const isReviewedXlsx = (preview) => preview?.previewKind === 'treasury-reviewed-v1';
@@ -99,6 +100,11 @@ export function localPreviewPath(resource, partition) {
     if (sourceFormat === 'CSV') {
         const match = typeof path === 'string' && /^data\/csv\/([\da-f]{8}-(?:[\da-f]{4}-){3}[\da-f]{12})-v1-([\da-f]{64})\.json$/.exec(path);
         return match && !partition && !isAnnualPreview(preview) && match[1] === resource.id &&
+            match[2] === preview.sourceSha256 ? path : null;
+    }
+    if (isPublicXlsx(preview)) {
+        const match = typeof path === 'string' && /^data\/public-xlsx\/([\da-f]{8}-(?:[\da-f]{4}-){3}[\da-f]{12})-v1-([\da-f]{64})\.json$/.exec(path);
+        return match && !partition && sourceFormat === 'XLSX' && match[1] === resource.id &&
             match[2] === preview.sourceSha256 ? path : null;
     }
     if (isReviewedXlsx(preview)) {
@@ -208,24 +214,27 @@ export function validateWorkbook(value, resource, partition, reportSheet) {
         }
         return value;
     }
-    if (localSourceFormat(resource.local_preview) === 'CSV') {
+    if (localSourceFormat(resource.local_preview) === 'CSV' || isPublicXlsx(resource.local_preview)) {
         const preview = resource.local_preview;
         const sheet = value.sheets[0];
-        if (partition || !localPreviewPath(resource) || value.sourceFormat !== 'CSV' || value.licenseId !== 'CC0-1.0' ||
+        const publicXlsx = isPublicXlsx(preview);
+        const note = (text) => text === undefined || (typeof text === 'string' && text.length > 0 && text.length <= 256);
+        if (partition || !localPreviewPath(resource) || value.sourceFormat !== (publicXlsx ? 'XLSX' : 'CSV') ||
+            (publicXlsx && !isPublicXlsx(value)) || value.licenseId !== 'CC0-1.0' ||
             value.licenseId !== preview.licenseId || value.publisher !== preview.publisher ||
             value.convertedAt !== preview.convertedAt || value.sheets.length !== 1 ||
             !Number.isSafeInteger(preview.total) || preview.total < 1 || preview.total > 5000 ||
-            (sheet?.sourceCaption !== undefined && (typeof sheet.sourceCaption !== 'string' || !sheet.sourceCaption ||
-                sheet.sourceCaption.length > 256)) ||
+            !note(sheet?.sourceCaption) || !note(sheet?.sourceFooter) ||
             !Array.isArray(sheet?.fields) || sheet.fields.length < 2 || sheet.fields.length > 32 ||
             !Array.isArray(sheet.rows) || sheet.rows.length !== sheet.total || sheet.total !== preview.total ||
-            sheet.fields.some((field) => !field || field.type !== 'text' || typeof field.id !== 'string' || !field.id.trim() ||
+            sheet.fields.some((field) => !field || (field.type !== 'text' && !(publicXlsx && field.type === 'decimal')) || typeof field.id !== 'string' || !field.id.trim() ||
                 field.id.length > 256 || !Array.isArray(field.dictionary) || field.dictionary.length > sheet.total ||
-                field.dictionary.some((v) => typeof v !== 'string' || !v.length || v.length > 256)) ||
+                field.dictionary.some((v) => typeof v !== 'string' || !v.length || v.length > 256 ||
+                    (field.type === 'decimal' && (v.length > 64 || !/^-?[0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]{1,2})?$/.test(v))))) ||
             new Set(sheet.fields.map((f) => f.id.normalize('NFKC').trim().toLocaleLowerCase('lv'))).size !== sheet.fields.length ||
             sheet.rows.some((row) => !Array.isArray(row) || row.length !== sheet.fields.length ||
                 row.some((v, i) => v !== null && (!Number.isSafeInteger(v) || v < 0 || v >= sheet.fields[i].dictionary.length)))) {
-            throw new Error('CSV tabulas kopija neatbilst atlasītajam avotam.');
+            throw new Error(publicXlsx ? 'XLSX tabulas kopija neatbilst atlasītajam avotam.' : 'CSV tabulas kopija neatbilst atlasītajam avotam.');
         }
         return value;
     }

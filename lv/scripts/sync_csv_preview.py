@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
+from parse_public_table_xlsx import parse_xlsx
 from budget_estimate_fallback import MAX_CATALOG, fetch_pages, parse_json, require_digest, timestamp, transient
 from publish_budget_estimates import atomic_bytes, exactly_one, json_bytes
 
@@ -41,10 +42,17 @@ class ReviewedSource:
     delimiter: str = ';'
     encoding: str = 'utf-8-sig'
     preamble: tuple[str, ...] | None = None
+    source_format: str = 'CSV'
+    sheet_name: str = 'Dati'
+    header_row: int = 1
+    decimal_columns: tuple[int, ...] = ()
+    footer: tuple[str, ...] | None = None
+    localized_url: bool = False
+    catalog_format: str | None = None
 
     @property
     def url(self):
-        return (f'https://data.gov.lv/dati/dataset/{self.dataset_id}'
+        return (f'https://data.gov.lv/dati/{"lv/" if self.localized_url else ""}dataset/{self.dataset_id}'
                 f'/resource/{self.resource_id}/download/{self.slug}')
 
 
@@ -88,7 +96,8 @@ class SourceChanged(ValueError):
 def download(source):
     req = urllib.request.Request(source.url, headers={'User-Agent': 'LatvijasDatiExplorer/1.1'})
     with urllib.request.build_opener(NoRedirect()).open(req, timeout=15) as response:
-        if response.status != 200 or response.headers.get_content_type() != 'text/csv':
+        mime = {'CSV': 'text/csv', 'XLSX': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}
+        if response.status != 200 or response.headers.get_content_type() != mime.get(source.source_format):
             raise ValueError('Reviewed CSV endpoint returned an unexpected response')
         return response.read(MAX_SOURCE + 1)
 
@@ -128,6 +137,7 @@ def parse_csv(content, source):
         validate_text(label, MAX_CELL)
 
     rows = []
+    found_footer = False
     dictionaries = [[] for _ in source.headers]
     lookups = [{} for _ in source.headers]
     for row_number, raw_row in enumerate(raw, 2):
@@ -141,6 +151,14 @@ def parse_csv(content, source):
             raise ValueError(f'CSV record {row_number} has data in an unlabelled column')
         if not any(raw_row):
             continue
+        if source.footer is not None and tuple(raw_row) == source.footer:
+            if found_footer or len(rows) != source.row_count or not source.footer[0] or any(source.footer[1:]):
+                raise ValueError('Unexpected position of reviewed CSV source note')
+            validate_text(source.footer[0], MAX_CELL)
+            found_footer = True
+            continue
+        if found_footer:
+            raise ValueError('Unexpected data after reviewed CSV source note')
         row = []
         for i, value in enumerate(raw_row[:width]):
             validate_text(value, MAX_CELL)
@@ -152,7 +170,7 @@ def parse_csv(content, source):
                 dictionaries[i].append(value)
             row.append(lookups[i][value])
         rows.append(row)
-    if not rows or len(rows) != source.row_count:
+    if not rows or len(rows) != source.row_count or (source.footer is not None and not found_footer):
         raise ValueError('Reviewed CSV record count changed')
     sheet = {
         'name': 'Dati',
@@ -160,6 +178,7 @@ def parse_csv(content, source):
                    for name, dictionary in zip(source.headers, dictionaries)],
         'rows': rows, 'total': len(rows), 'cachedFormulaCount': 0,
         **({'sourceCaption': source.preamble[0]} if source.preamble is not None else {}),
+        **({'sourceFooter': source.footer[0]} if found_footer else {}),
     }
     if source.table_sha256 is not None and sha256(json_bytes(sheet)) != source.table_sha256:
         raise ValueError('Reviewed CSV table digest differs from the expected conversion')
@@ -178,22 +197,24 @@ def reviewed_resources(catalog, sources):
         if (dataset.get('license_id') not in ('CC0-1.0', 'cc-zero') or dataset.get('private', False)
                 or (dataset.get('organization') or {}).get('name') != source.organization):
             raise ValueError(f'Reviewed CSV publisher or license changed: {source.resource_id}')
-        if resource.get('url') != source.url or resource.get('format') != 'CSV':
+        if resource.get('url') != source.url or resource.get('format') != (source.catalog_format or source.source_format):
             raise ValueError(f'Reviewed CSV source address or format changed: {source.resource_id}')
         existing = resource.get('local_preview')
-        if existing and existing.get('sourceFormat') != 'CSV':
+        if existing and existing.get('sourceFormat') != source.source_format:
             raise ValueError(f'Will not replace another preview type: {source.resource_id}')
         selected[source.resource_id] = resource
     return selected
 
 
 def preview_path(source):
-    return f'data/csv/{source.resource_id}-v1-{source.sha256}.json'
+    folder = 'csv' if source.source_format == 'CSV' else 'public-xlsx'
+    return f'data/{folder}/{source.resource_id}-v1-{source.sha256}.json'
 
 
 def provenance(source, converted_at):
-    return {'sourceUrl': source.url, 'sourceFormat': 'CSV', 'sourceSha256': source.sha256,
-            'convertedAt': converted_at, 'licenseId': 'CC0-1.0', 'publisher': source.publisher}
+    return {'sourceUrl': source.url, 'sourceFormat': source.source_format, 'sourceSha256': source.sha256,
+            'convertedAt': converted_at, 'licenseId': 'CC0-1.0', 'publisher': source.publisher,
+            **({'previewKind': 'public-reviewed-xlsx-v1'} if source.source_format == 'XLSX' else {})}
 
 
 def prepare(selected, source_dir, sources, *, whole_group=False):
@@ -204,11 +225,20 @@ def prepare(selected, source_dir, sources, *, whole_group=False):
         if not whole_group and resource.get('datastore_active') and not resource.get('local_preview'):
             continue
         if source_dir is not None:
-            with (source_dir / f'{source.resource_id}.csv').open('rb') as handle:
+            with (source_dir / f'{source.resource_id}.{source.source_format.lower()}').open('rb') as handle:
                 content = handle.read(MAX_SOURCE + 1)
         else:
             content = download(source)
-        sheet = parse_csv(content, source)
+        if source.source_format == 'XLSX':
+            if len(content) > MAX_SOURCE or sha256(content) != source.sha256:
+                raise SourceChanged(f'Reviewed spreadsheet bytes changed; review required: {source.resource_id}')
+            sheet = parse_xlsx(content, source)
+            if not source.table_sha256 or sha256(json_bytes(sheet)) != source.table_sha256:
+                raise ValueError('Reviewed spreadsheet table checksum differs')
+        elif source.source_format == 'CSV':
+            sheet = parse_csv(content, source)
+        else:
+            raise ValueError('Unknown reviewed source format')
         converted_at = datetime.now(timezone.utc).isoformat()
         path = preview_path(source)
         fields = provenance(source, converted_at)
