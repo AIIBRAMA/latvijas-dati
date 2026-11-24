@@ -218,13 +218,13 @@ export function validateWorkbook(value, resource, partition, reportSheet) {
         const preview = resource.local_preview;
         const sheet = value.sheets[0];
         const publicXlsx = isPublicXlsx(preview);
-        const note = (text) => text === undefined || (typeof text === 'string' && text.length > 0 && text.length <= 256);
+        const note = (text, max = 256) => text === undefined || (typeof text === 'string' && text.length > 0 && text.length <= max);
         if (partition || !localPreviewPath(resource) || value.sourceFormat !== (publicXlsx ? 'XLSX' : 'CSV') ||
             (publicXlsx && !isPublicXlsx(value)) || value.licenseId !== 'CC0-1.0' ||
             value.licenseId !== preview.licenseId || value.publisher !== preview.publisher ||
             value.convertedAt !== preview.convertedAt || value.sheets.length !== 1 ||
             !Number.isSafeInteger(preview.total) || preview.total < 1 || preview.total > 5000 ||
-            !note(sheet?.sourceCaption) || !note(sheet?.sourceFooter) ||
+            !note(sheet?.sourceCaption) || !note(sheet?.sourceFooter, publicXlsx ? 4096 : 256) || !note(sheet?.scopeNote) ||
             !Array.isArray(sheet?.fields) || sheet.fields.length < 2 || sheet.fields.length > 32 ||
             !Array.isArray(sheet.rows) || sheet.rows.length !== sheet.total || sheet.total !== preview.total ||
             sheet.fields.some((field) => !field || (field.type !== 'text' && !(publicXlsx && field.type === 'decimal')) || typeof field.id !== 'string' || !field.id.trim() ||

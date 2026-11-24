@@ -23,3 +23,22 @@ test('reviewed public XLSX is bound to the resource and exports exact numeric da
     resource.local_preview.path=path.replace('public-xlsx','csv');
     assert.equal(localPreviewPath(resource),null);
 });
+
+test('only reviewed public XLSX accepts expanded notes and CSV does not include scope or footnotes',()=>{
+    const path=`data/public-xlsx/${id}-v1-${sourceSha256}.json`;
+    const resource={id,local_preview:{path,total:1,...meta}};
+    const table={name:'Sheet1',sourceFooter:`${'A'.repeat(260)}\nPiezīme.`,scopeNote:'Nepieskaitīt citai atskaitei.',fields:[
+        {id:'Periods',type:'text',dictionary:['2026Q1']},
+        {id:'Value',type:'decimal',dictionary:['29.170000000000002']}
+    ],rows:[[0,0]],total:1};
+    const data={schemaVersion:1,resourceId:id,...meta,sheets:[table]};
+    const checked=validateWorkbook(data,resource).sheets[0];
+    assert.equal(checked.sourceFooter,table.sourceFooter);
+    assert.match(rowsCsv(checked,checked.rows),/29\.170000000000002/);
+    assert.doesNotMatch(rowsCsv(checked,checked.rows),/Piezīme|Nepieskaitīt/);
+    const csvResource={id,local_preview:{...resource.local_preview,sourceFormat:'CSV',path:path.replace('public-xlsx','csv')}};
+    const csvTable={...table,fields:table.fields.map((field)=>({...field,type:'text'}))};
+    assert.throws(()=>validateWorkbook({...data,sourceFormat:'CSV',sheets:[csvTable]},csvResource), /neatbilst/);
+    table.sourceFooter='A'.repeat(4097);
+    assert.throws(()=>validateWorkbook(data,resource), /neatbilst/);
+});

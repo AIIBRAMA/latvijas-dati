@@ -49,6 +49,10 @@ class ReviewedSource:
     footer: tuple[str, ...] | None = None
     localized_url: bool = False
     catalog_format: str | None = None
+    first_column: int = 0
+    xlsx_footer_cells: tuple[str, ...] = ()
+    xlsx_footer_merges: tuple[str, ...] = ()
+    scope_note: str | None = None
 
     @property
     def url(self):
