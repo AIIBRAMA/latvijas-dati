@@ -14,11 +14,14 @@ export const FILTERS = [
     ['ministrija', 'Ministrija'], ['iestade', 'Iestāde'], ['tips', 'Ieņēmumi / izdevumi / finansēšana'],
     ['budzeta_tips', 'Budžeta tips'], ['progr_apaksprogr_kods', 'Programmas / apakšprogrammas kods'],
     ['ekk_kods', 'EKK kods'], ['funkcija', 'Funkcija'],
-    ['sakotnejais_budzets', 'Sākotnējais budžets (avota vērtība)']
+    ['sakotnejais_budzets', 'Sākotnējais budžets (avota vērtība)'],
+    ['Ceturksnis', 'Ceturksnis'], ['Ce-turksnis', 'Ceturksnis'], ['Mēnesis', 'Mēnesis (avota kods)'],
+    ['Iepirkuma veids', 'Iepirkuma veids'], ['Pēc līgum-cenu sliekšņa', 'Pēc līgumcenu sliekšņa']
 ];
 export const PRIMARY_FILTERS = {
     XLSX: ['Gads', 'Menesis_nr', 'Novadi_pilsetas', 'Iestade', 'Klasifikacija'],
-    JSON: ['Gads', 'ministrija', 'iestade', 'tips']
+    JSON: ['Gads', 'ministrija', 'iestade', 'tips'],
+    CSV: ['Gads', 'Mēnesis', 'Iepirkuma veids']
 };
 export const localSourceFormat = (preview) => preview?.sourceFormat ?? 'XLSX';
 export const isAnnualPreview = (preview) => preview?.previewKind === 'treasury-annual-v1';
@@ -38,8 +41,13 @@ export function localPreviewPartitions(resource) {
 export function localPreviewPath(resource, partition) {
     const preview = resource?.local_preview;
     const sourceFormat = localSourceFormat(preview);
-    if (!preview || (sourceFormat !== 'XLSX' && sourceFormat !== 'JSON')) return null;
+    if (!preview || (sourceFormat !== 'XLSX' && sourceFormat !== 'JSON' && sourceFormat !== 'CSV')) return null;
     const path = partition?.path ?? (!partition ? preview.path : null);
+    if (sourceFormat === 'CSV') {
+        const match = typeof path === 'string' && /^data\/csv\/([\da-f]{8}-(?:[\da-f]{4}-){3}[\da-f]{12})-v1-([\da-f]{64})\.json$/.exec(path);
+        return match && !partition && !isAnnualPreview(preview) && match[1] === resource.id &&
+            match[2] === preview.sourceSha256 ? path : null;
+    }
     if (isAnnualPreview(preview)) {
         const match = typeof path === 'string' && /^data\/annual-xlsx\/([\da-f]{8}-(?:[\da-f]{4}-){3}[\da-f]{12})-v1-([\da-f]{16})-([\da-f]{16})\.json$/.exec(path);
         return match && sourceFormat === 'XLSX' && !partition && match[1] === resource.id &&
@@ -67,6 +75,25 @@ export function cell(sheet, row, index) {
 }
 export function validateWorkbook(value, resource, partition) {
     if (value?.schemaVersion !== 1 || value.resourceId !== resource.id || value.sourceUrl !== resource.local_preview.sourceUrl || value.sourceSha256 !== resource.local_preview.sourceSha256 || (value.sourceFormat != null && value.sourceFormat !== localSourceFormat(resource.local_preview)) || !Array.isArray(value.sheets) || !value.sheets.length) throw new Error('Datu kopija neatbilst izvēlētajam resursam. Pārlādējiet vietni.');
+    if (localSourceFormat(resource.local_preview) === 'CSV') {
+        const preview = resource.local_preview;
+        const sheet = value.sheets[0];
+        if (partition || !localPreviewPath(resource) || value.sourceFormat !== 'CSV' || value.licenseId !== 'CC0-1.0' ||
+            value.licenseId !== preview.licenseId || value.publisher !== preview.publisher ||
+            value.convertedAt !== preview.convertedAt || value.sheets.length !== 1 ||
+            !Number.isSafeInteger(preview.total) || preview.total < 1 || preview.total > 5000 ||
+            !Array.isArray(sheet?.fields) || sheet.fields.length < 2 || sheet.fields.length > 32 ||
+            !Array.isArray(sheet.rows) || sheet.rows.length !== sheet.total || sheet.total !== preview.total ||
+            sheet.fields.some((field) => !field || field.type !== 'text' || typeof field.id !== 'string' || !field.id.trim() ||
+                field.id.length > 256 || !Array.isArray(field.dictionary) || field.dictionary.length > sheet.total ||
+                field.dictionary.some((v) => typeof v !== 'string' || !v.length || v.length > 256)) ||
+            new Set(sheet.fields.map((f) => f.id.normalize('NFKC').trim().toLocaleLowerCase('lv'))).size !== sheet.fields.length ||
+            sheet.rows.some((row) => !Array.isArray(row) || row.length !== sheet.fields.length ||
+                row.some((v, i) => v !== null && (!Number.isSafeInteger(v) || v < 0 || v >= sheet.fields[i].dictionary.length)))) {
+            throw new Error('CSV tabulas kopija neatbilst atlasītajam avotam.');
+        }
+        return value;
+    }
     for (const sheet of value.sheets) {
         if (!Array.isArray(sheet.fields) || !Array.isArray(sheet.rows) || sheet.rows.length !== sheet.total || !sheet.fields.some((f) => f.id === 'Summa')) throw new Error('Datu kopijas struktūra nav derīga.');
         if (partition) {
