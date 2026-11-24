@@ -36,6 +36,11 @@ class ReviewedSource:
     empty_tail_columns: int
     row_count: int
     table_sha256: str | None = None
+    organization: str = 'iub'
+    publisher: str = 'Iepirkumu uzraudzības birojs'
+    delimiter: str = ';'
+    encoding: str = 'utf-8-sig'
+    preamble: tuple[str, ...] | None = None
 
     @property
     def url(self):
@@ -100,8 +105,15 @@ def parse_csv(content, source):
         raise ValueError('CSV byte limit exceeded')
     if hashlib.sha256(content).hexdigest() != source.sha256:
         raise SourceChanged(f'Reviewed CSV bytes changed; source requires review: {source.resource_id}')
-    text = content.decode('utf-8-sig', errors='strict')
-    raw = csv.reader(io.StringIO(text, newline=''), delimiter=';', strict=True)
+    if source.encoding not in ('utf-8-sig', 'cp1257') or source.delimiter not in (';', ',', '\t'):
+        raise ValueError('Unsupported reviewed CSV encoding or delimiter')
+    text = content.decode(source.encoding, errors='strict')
+    raw = csv.reader(io.StringIO(text, newline=''), delimiter=source.delimiter, strict=True)
+    if source.preamble is not None:
+        if (not source.preamble or not source.preamble[0] or len(source.preamble) > MAX_COLUMNS
+                or any(source.preamble[1:]) or tuple(next(raw, [])) != source.preamble):
+            raise ValueError('Reviewed CSV title row changed')
+        validate_text(source.preamble[0], MAX_CELL)
     header = next(raw, [])
     width = len(source.headers)
     if not 1 < width <= MAX_COLUMNS or len(header) > MAX_COLUMNS:
@@ -147,6 +159,7 @@ def parse_csv(content, source):
         'fields': [{'id': name, 'type': 'text', 'dictionary': dictionary}
                    for name, dictionary in zip(source.headers, dictionaries)],
         'rows': rows, 'total': len(rows), 'cachedFormulaCount': 0,
+        **({'sourceCaption': source.preamble[0]} if source.preamble is not None else {}),
     }
     if source.table_sha256 is not None and sha256(json_bytes(sheet)) != source.table_sha256:
         raise ValueError('Reviewed CSV table digest differs from the expected conversion')
@@ -163,7 +176,7 @@ def reviewed_resources(catalog, sources):
         dataset = exactly_one(catalog['datasets'], 'id', source.dataset_id, 'CSV dataset')
         resource = exactly_one(dataset['resources'], 'id', source.resource_id, 'CSV resource')
         if (dataset.get('license_id') not in ('CC0-1.0', 'cc-zero') or dataset.get('private', False)
-                or (dataset.get('organization') or {}).get('name') != 'iub'):
+                or (dataset.get('organization') or {}).get('name') != source.organization):
             raise ValueError(f'Reviewed CSV publisher or license changed: {source.resource_id}')
         if resource.get('url') != source.url or resource.get('format') != 'CSV':
             raise ValueError(f'Reviewed CSV source address or format changed: {source.resource_id}')
@@ -180,7 +193,7 @@ def preview_path(source):
 
 def provenance(source, converted_at):
     return {'sourceUrl': source.url, 'sourceFormat': 'CSV', 'sourceSha256': source.sha256,
-            'convertedAt': converted_at, 'licenseId': 'CC0-1.0', 'publisher': 'Iepirkumu uzraudzības birojs'}
+            'convertedAt': converted_at, 'licenseId': 'CC0-1.0', 'publisher': source.publisher}
 
 
 def prepare(selected, source_dir, sources, *, whole_group=False):

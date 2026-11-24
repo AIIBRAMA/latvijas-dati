@@ -215,6 +215,8 @@ export function validateWorkbook(value, resource, partition, reportSheet) {
             value.licenseId !== preview.licenseId || value.publisher !== preview.publisher ||
             value.convertedAt !== preview.convertedAt || value.sheets.length !== 1 ||
             !Number.isSafeInteger(preview.total) || preview.total < 1 || preview.total > 5000 ||
+            (sheet?.sourceCaption !== undefined && (typeof sheet.sourceCaption !== 'string' || !sheet.sourceCaption ||
+                sheet.sourceCaption.length > 256)) ||
             !Array.isArray(sheet?.fields) || sheet.fields.length < 2 || sheet.fields.length > 32 ||
             !Array.isArray(sheet.rows) || sheet.rows.length !== sheet.total || sheet.total !== preview.total ||
             sheet.fields.some((field) => !field || field.type !== 'text' || typeof field.id !== 'string' || !field.id.trim() ||

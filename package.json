@@ -12,7 +12,7 @@
     "start": "vite --config vite.lv.config.js --host 127.0.0.1",
     "build": "vite build --config vite.lv.config.js",
     "preview": "vite preview --config vite.lv.config.js --host 127.0.0.1",
-    "sync": "python3 lv/scripts/sync_catalog.py && python3 lv/scripts/sync_xlsx.py && python3 lv/scripts/publish_budget_estimates.py && python3 lv/scripts/sync_annual_xlsx.py --allow-standby && python3 lv/scripts/sync_csv_preview.py --allow-standby && python3 lv/scripts/sync_reviewed_xlsx.py --allow-standby && python3 lv/scripts/sync_treasury_sheets.py --allow-standby && python3 lv/scripts/sync_treasury_monthly.py --allow-standby",
+    "sync": "python3 lv/scripts/sync_catalog.py && python3 lv/scripts/sync_xlsx.py && python3 lv/scripts/publish_budget_estimates.py && python3 lv/scripts/sync_annual_xlsx.py --allow-standby && python3 lv/scripts/sync_csv_preview.py --allow-standby && python3 lv/scripts/sync_reviewed_xlsx.py --allow-standby && python3 lv/scripts/sync_treasury_sheets.py --allow-standby && python3 lv/scripts/sync_treasury_monthly.py --allow-standby && python3 lv/scripts/sync_other_csv.py --allow-standby",
     "test": "node --test lv/tests/*.test.js",
     "sync:xlsx": "python3 lv/scripts/sync_xlsx.py",
     "sync:budget": "python3 lv/scripts/publish_budget_estimates.py",
@@ -20,7 +20,8 @@
     "sync:csv": "python3 lv/scripts/sync_csv_preview.py",
     "sync:reviewed-xlsx": "python3 lv/scripts/sync_reviewed_xlsx.py",
     "sync:treasury-sheets": "python3 lv/scripts/sync_treasury_sheets.py",
-    "sync:treasury-monthly": "python3 lv/scripts/sync_treasury_monthly.py"
+    "sync:treasury-monthly": "python3 lv/scripts/sync_treasury_monthly.py",
+    "sync:other-csv": "python3 lv/scripts/sync_other_csv.py"
   },
   "dependencies": {
     "react": "19.2.0",
