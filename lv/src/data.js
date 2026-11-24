@@ -3,7 +3,21 @@ export const normalize = (value = '') => String(value ?? '').normalize('NFD').re
 export const format = (value = '') => String(value ?? '').trim().replace(/^\./, '').toUpperCase() || 'CITS';
 export const date = (value) => value && !Number.isNaN(Date.parse(value)) ? new Date(value.endsWith('Z') || /[+-]\d\d:\d\d$/.test(value) ? value : `${value}Z`).toLocaleDateString('lv-LV') : 'Nav norādīts';
 export const safeUrl = (value) => {try {const url = new URL(value); return ['http:', 'https:'].includes(url.protocol) ? url.href : null;} catch {return null;}};
-export const hasPreview = (resource) => Boolean(resource.datastore_active || resource.local_preview);
+// Audited public CKAN resources whose DataStore returned 404 despite an active
+// catalogue flag (2026-11-24). Recheck DataStore before removing an entry.
+// This only suppresses broken live table buttons, never files or local copies.
+const UNAVAILABLE_DATASTORE = new Set([
+    '19c8e915-cc00-457d-98c5-d05b2e8fbaf8', // IUB 2016 Q3
+    'ee6bde54-fe44-4237-9755-54b970c316f8', // IUB 2016 Q4
+    'cd9b78fa-3acb-4c2c-a710-56927e70c4f7', // IUB CPV 2015 Q4
+    '371c14d7-1c34-4abd-94ee-14a01f6362d9', // IUB CPV 2018 Q2
+    '0f2a8453-724c-45a6-9c96-e25c5259ed5d', // NMPD 2026-01
+]);
+export function hasPreview(resource) {
+    if (resource.local_preview) return true;
+    return (resource.datastore_active === true || resource.datastore_active === 'true')
+        && !UNAVAILABLE_DATASTORE.has(resource.id);
+}
 export function mergePreviewResources(live, snapshot) {
     const originals = new Map(snapshot.map((r) => [r.id, r]));
     return live.map((r) => {const old = originals.get(r.id); return {...r, ...(old?.local_preview && old.url === r.url ? {local_preview: old.local_preview} : {})};});
