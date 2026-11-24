@@ -8,6 +8,8 @@ export const FILTERS = [
     ['EKK_kods_1_limenis', 'EKK 1. līmenis'], ['EKK_kods_2_limenis', 'EKK 2. līmenis'], ['EKK_kods_7_limenis', 'EKK 7. līmenis'],
     ['Funkcija_augstakais_limenis_Nosaukums', 'Funkcija'], ['Datu_valuta', 'Valūta'],
     ['Novadi_pilsetas', 'Pašvaldība'], ['ATVK', 'ATVK kods'], ['Valuta', 'Valūta'],
+    ['Novads', 'Novads / valstspilsēta'], ['Tips', 'Rindas tips'], ['ien_izd', 'Ieņēmumi / izdevumi'],
+    ['EKK', 'EKK kods'], ['Funkcija_Liela', 'Funkcijas augstākais līmenis'],
     ['Funkcija_kods_1_limenis', 'Funkcijas kods (1. līmenis)'], ['Funkcija_1_limenis', 'Funkcija (1. līmenis)'],
     ['ministrija', 'Ministrija'], ['iestade', 'Iestāde'], ['tips', 'Ieņēmumi / izdevumi / finansēšana'],
     ['budzeta_tips', 'Budžeta tips'], ['progr_apaksprogr_kods', 'Programmas / apakšprogrammas kods'],
@@ -19,6 +21,7 @@ export const PRIMARY_FILTERS = {
     JSON: ['Gads', 'ministrija', 'iestade', 'tips']
 };
 export const localSourceFormat = (preview) => preview?.sourceFormat ?? 'XLSX';
+export const isAnnualPreview = (preview) => preview?.previewKind === 'treasury-annual-v1';
 
 export function localPreviewPartitions(resource) {
     const preview = resource?.local_preview;
@@ -37,6 +40,12 @@ export function localPreviewPath(resource, partition) {
     const sourceFormat = localSourceFormat(preview);
     if (!preview || (sourceFormat !== 'XLSX' && sourceFormat !== 'JSON')) return null;
     const path = partition?.path ?? (!partition ? preview.path : null);
+    if (isAnnualPreview(preview)) {
+        const match = typeof path === 'string' && /^data\/annual-xlsx\/([\da-f]{8}-(?:[\da-f]{4}-){3}[\da-f]{12})-v1-([\da-f]{16})-([\da-f]{16})\.json$/.exec(path);
+        return match && sourceFormat === 'XLSX' && !partition && match[1] === resource.id &&
+            /^[\da-f]{64}$/.test(preview.sourceSha256 ?? '') && preview.sourceSha256.startsWith(match[2]) &&
+            /^[\da-f]{64}$/.test(preview.sha256 ?? '') && preview.sha256.startsWith(match[3]) ? path : null;
+    }
     const parts = typeof path === 'string' && /^data\/(xlsx|json)\/([\da-f]{8}-(?:[\da-f]{4}-){3}[\da-f]{12})-v1-([\da-f]{16,64})(?:-(\d{4}))?\.json$/.exec(path);
     if (!parts || parts[1] !== sourceFormat.toLowerCase() || parts[2] !== resource.id ||
         typeof preview.sourceSha256 !== 'string' || !preview.sourceSha256.startsWith(parts[3]) ||
@@ -45,7 +54,7 @@ export function localPreviewPath(resource, partition) {
 }
 
 export function chartLabelField(fields) {
-    return ['Novadi_pilsetas', 'Iestade', 'iestade', 'ministrija'].find((id) => fields.some((field) => field.id === id)) || fields[0]?.id;
+    return ['Novadi_pilsetas', 'Novads', 'Iestade', 'iestade', 'ministrija'].find((id) => fields.some((field) => field.id === id)) || fields[0]?.id;
 }
 
 export function chartCurrencyField(fields) {
@@ -64,6 +73,13 @@ export function validateWorkbook(value, resource, partition) {
             const yearIndex = sheet.fields.findIndex((field) => field.id === 'Gads');
             if (yearIndex < 0 || sheet.rows.some((row) => String(cell(sheet, row, yearIndex)) !== partition.label)) throw new Error('Datu kopijā ir citam gadam atbilstoši ieraksti.');
         }
+    }
+    if (isAnnualPreview(resource.local_preview)) {
+        const {reportYear, total, convertedAt} = resource.local_preview;
+        if (!isAnnualPreview(value) || value.sourceFormat !== 'XLSX' || !Number.isSafeInteger(reportYear) || value.reportYear !== reportYear ||
+            value.convertedAt !== convertedAt || value.sheets.length !== 1 || value.sheets[0].total !== total ||
+            value.sheets[0].fields[0]?.id !== 'Gads' || value.sheets[0].fields.find((field) => field.id === 'Summa')?.sourceId !== 'Summa_EUR' ||
+            value.sheets[0].rows.some((row) => !Array.isArray(row) || row.length !== value.sheets[0].fields.length || row[0] !== reportYear)) throw new Error('Gada pārskata kopija neatbilst atlasītajam avotam.');
     }
     if (partition && value.sheets.reduce((count, sheet) => count + sheet.total, 0) !== partition.total) throw new Error('Datu kopijas ierakstu skaits neatbilst izvēlētajam gadam.');
     return value;

@@ -12,10 +12,11 @@
     "start": "vite --config vite.lv.config.js --host 127.0.0.1",
     "build": "vite build --config vite.lv.config.js",
     "preview": "vite preview --config vite.lv.config.js --host 127.0.0.1",
-    "sync": "python3 lv/scripts/sync_catalog.py && python3 lv/scripts/sync_xlsx.py && python3 lv/scripts/publish_budget_estimates.py",
+    "sync": "python3 lv/scripts/sync_catalog.py && python3 lv/scripts/sync_xlsx.py && python3 lv/scripts/publish_budget_estimates.py && python3 lv/scripts/sync_annual_xlsx.py --allow-standby",
     "test": "node --test lv/tests/*.test.js",
     "sync:xlsx": "python3 lv/scripts/sync_xlsx.py",
-    "sync:budget": "python3 lv/scripts/publish_budget_estimates.py"
+    "sync:budget": "python3 lv/scripts/publish_budget_estimates.py",
+    "sync:annual": "python3 lv/scripts/sync_annual_xlsx.py"
   },
   "dependencies": {
     "react": "19.2.0",
