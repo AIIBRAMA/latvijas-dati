@@ -22,7 +22,9 @@
 
 ## Robežas
 
-Pilnas GitHub Actions palaišanas un publiski izvērstās vietnes rezultāts ir atsevišķa publicēšanas pārbaude. Iepriekš minētie testi to neaizstāj. Ja avots vēlāk pārsniedz izmēra/rindu limitu, nomaina shēmu vai pārtrauc atbildēt, atjaunošana apstājas, saglabājot iepriekš publicēto vietni.
+Pilnas GitHub Actions palaišanas un publiski izvērstās vietnes rezultāts ir atsevišķa publicēšanas pārbaude. Iepriekš minētie testi to neaizstāj. Ja avots vēlāk pārsniedz izmēra/rindu limitu vai nomaina shēmu, atjaunošana apstājas, saglabājot iepriekš publicēto vietni.
+
+Tāmju savienojuma taimauts pārbaudīts, aizstājot lejupielādi ar kļūdu tieši pie tīkla robežas. Ar reālajām arhivētajām pilnajām tāmēm uzbūvēts portāls un pārbaudīti abu gadu faili (236 015 rindas kopā), kā arī visas četras XLSX kopijas. Papildu testi pārbauda nepareizas kontrolsummas vai gada datu noraidīšanu, jaunākās jau publicētās kopijas izvēli, patvaļīgu adrešu bloķēšanu un rezerves kopijas atzīmes noņemšanu, kad oficiālais avots atkal sniedz derīgus datus.
 
 Tālāk saglabāti agrāko piegāžu vēsturiskie pārbaudes protokoli. Tajos minētie datumi, rindu skaiti un toreiz nepārbaudītās publicēšanas darbības neapraksta šī papildinājuma pašreizējo stāvokli.
 

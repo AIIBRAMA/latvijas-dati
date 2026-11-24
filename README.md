@@ -31,7 +31,9 @@ Importam vajadzīga tikai Python standarta bibliotēka. Tāmju avots tiek piepra
 
 Avota JSON izmēra limits ir 384 MiB, rindu limits 400 000, viena gada pārlūka kopijas limits 24 MiB. Pārsniegums, mainīta shēma vai nepilns avots aptur atjaunošanu, nevis klusi izlaiž rindas. Pašreizējie divi gadu faili aizņem aptuveni 10,12 MB un 7,17 MB.
 
-JSON importētājs nomaina kataloga atsauces tikai pēc visu gadu veiksmīgas konvertēšanas. Kļūdas gadījumā tas saglabā iepriekšējo katalogu un failus; jaunus, vēl neatsauktus failus noņem. Atkārtoti izmanto tikai pārbaudītas tā paša satura kopijas. Vienā lokālajā projekta mapē palaidiet tikai vienu sinhronizāciju vienlaikus.
+JSON importētājs nomaina kataloga atsauces tikai pēc visu gadu veiksmīgas konvertēšanas. Ja shēma vai integritāte neatbilst pārbaudītajām prasībām, tas saglabā iepriekšējo katalogu un failus; jaunus, vēl neatsauktus failus noņem. Atkārtoti izmanto tikai pārbaudītas tā paša satura kopijas. Vienā lokālajā projekta mapē palaidiet tikai vienu sinhronizāciju vienlaikus.
+
+Ja tieši tāmju avots īslaicīgi neatbild, būvējums var izmantot jau publicēto jaunāko pārbaudīto kopiju no šīs vietnes vai sākotnējo 2026. gada 24. novembra kopiju no `lv/fixtures/budget-estimates`. Pilnos gadu failus pārbauda pirms publicēšanas. Vietnē ir atzīme “rezerves kopija”, tās pārbaudes datums un brīdinājums, ka dati var nebūt aktuāli. Katrā nākamajā sinhronizācijā vispirms mēģina saņemt pilnus svaigus datus no oficiālā avota. Nepareiza shēma, neatļauts URL, TLS vai integritātes kļūda rezerves kopijas režīmu neieslēdz.
 
 GitHub Pages jau izpilda abus testu komplektus un `npm run sync` pirms būvēšanas un augšupielādes. Ja kāds avots vai konvertētājs neizdodas, jaunā vietne netiek publicēta; iepriekš publicētā vietne paliek pieejama. Lokāli `npm run sync` sastāv no secīgiem soļiem: pēc vēlākas kļūdas agrākais kataloga/XLSX solis var jau būt atjaunots. Pirms lokālas publicēšanas jāsagaida veiksmīgs **visas** sinhronizācijas rezultāts, ne jāturpina pēc kļūdas.
 

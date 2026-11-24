@@ -13,6 +13,7 @@ import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
+from budget_estimate_fallback import load_previous, load_seed, transient
 from sync_budget_estimates import (
     DATASET, RESOURCE_ID, SOURCE_URL, MAX_DOWNLOAD,
     download, parse_budget_estimates,
@@ -110,6 +111,50 @@ def referenced_preview_paths(catalog):
     return paths
 
 
+def prune_previews(root, catalog):
+    # Only old previews of this exact converter; unrelated resources are retained.
+    referenced = referenced_preview_paths(catalog)
+    for stale in (root / 'public/data/json').glob(f'{RESOURCE_ID}-v1-*.json'):
+        if 'data/json/' + stale.name not in referenced:
+            try:
+                stale.unlink()
+            except OSError as cleanup_error:
+                print(f'Warning: retained stale JSON preview: {cleanup_error}', file=sys.stderr)
+
+
+def cleanup_created(created):
+    for output in created:
+        try:
+            output.unlink()
+        except OSError as cleanup_error:
+            print(f'Warning: could not remove unreferenced new preview: {cleanup_error}', file=sys.stderr)
+
+
+def publish_fallback(root, catalog_path, catalog, resource):
+    baseline, assets = load_seed(root / 'fixtures/budget-estimates')
+    existing = load_previous(baseline)
+    preview, assets = existing if existing is not None else (baseline, assets)
+    created = []
+    try:
+        for path, encoded in assets:
+            output = root / 'public' / path
+            if output.exists():
+                if output.stat().st_size != len(encoded) or output.read_bytes() != encoded:
+                    raise ValueError('Existing preview conflicts with the verified budget snapshot')
+            else:
+                atomic_bytes(output, encoded)
+                created.append(output)
+        resource['local_preview'] = preview
+        atomic_bytes(catalog_path, json_bytes(catalog))
+    except Exception:
+        cleanup_created(created)
+        raise
+    prune_previews(root, catalog)
+    print(f'::warning::Valsts budžeta tāmes: live source unavailable; publishing the verified '
+          f'snapshot checked {preview["sourceCheckedAt"]} ({preview["total"]} rows)', flush=True)
+    return preview
+
+
 def publish(source_dir=None, *, root=None):
     root = Path(root) if root is not None else ROOT
     catalog_path = root / 'public/data/catalog.json'
@@ -125,7 +170,12 @@ def publish(source_dir=None, *, root=None):
             raise ValueError('Budget estimates source exceeds size limit')
         content = source_path.read_bytes()
     else:
-        content = download(SOURCE_URL)
+        try:
+            content = download(SOURCE_URL)
+        except OSError as exc:
+            if not transient(exc):
+                raise
+            return publish_fallback(root, catalog_path, catalog, resource)
     if len(content) > MAX_DOWNLOAD:
         raise ValueError('Budget estimates source exceeds size limit')
     sheets = parse_budget_estimates(content)
@@ -180,29 +230,20 @@ def publish(source_dir=None, *, root=None):
                 created.append(output)
                 total_bytes += len(encoded)
             partitions.append({'label': year, 'path': 'data/json/' + name,
-                               'total': sum(sheet['total'] for sheet in grouped[year])})
+                               'total': sum(sheet['total'] for sheet in grouped[year]),
+                               'sha256': hashlib.sha256(encoded).hexdigest()})
         preview = {'sourceFormat': 'JSON', 'partitions': partitions,
                    'sourceUrl': SOURCE_URL, 'sourceSha256': sha,
                    'convertedAt': converted_at, 'total': sum(sheet['total'] for sheet in sheets)}
+        if source_dir is None:
+            preview['sourceCheckedAt'] = datetime.now(timezone.utc).isoformat()
         resource['local_preview'] = preview
         atomic_bytes(catalog_path, json_bytes(catalog))
     except Exception:
-        for output in created:
-            try:
-                output.unlink()
-            except OSError as cleanup_error:
-                print(f'Warning: could not remove unreferenced new preview: {cleanup_error}', file=sys.stderr)
+        cleanup_created(created)
         raise
 
-    # Prune only this converter's stale versions after the catalog commit, never
-    # another JSON resource or an XLSX preview. Cleanup failure is safe to retain.
-    referenced = referenced_preview_paths(catalog)
-    for stale in (root / 'public/data/json').glob(f'{RESOURCE_ID}-v1-*.json'):
-        if 'data/json/' + stale.name not in referenced:
-            try:
-                stale.unlink()
-            except OSError as cleanup_error:
-                print(f'Warning: retained stale JSON preview: {cleanup_error}', file=sys.stderr)
+    prune_previews(root, catalog)
     print(f'{RESOURCE_ID}: {len(partitions)} year partitions, {preview["total"]} rows, '
           f'{total_bytes} JSON bytes', flush=True)
     return preview

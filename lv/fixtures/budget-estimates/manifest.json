@@ -1,0 +1,24 @@
+{
+  "sourceFormat": "JSON",
+  "sourceUrl": "https://opendata.kase.gov.lv/api/v1/valsts_budzeta_tames",
+  "sourceSha256": "2b384a78d4c655d48c67401d4234ec6e561ffb7e4a5509c028a68dc49302ca05",
+  "convertedAt": "2026-11-24T09:25:33.544574+00:00",
+  "sourceCheckedAt": "2026-11-24T09:25:33.544574+00:00",
+  "total": 236015,
+  "partitions": [
+    {
+      "label": "2026",
+      "path": "data/json/45368057-dfd7-4c56-9cac-5ca0e22ca086-v1-2b384a78d4c655d4-2026.json",
+      "total": 98024,
+      "sha256": "903a8ed86e55cc286c598d9a9baceaf5b12f4f8925a4539981d524fa70e6aa30",
+      "compressedSha256": "8c93db1e29b83f98903c683b11eae590d7a59d65e820d902a4fa3b1b5217eaf5"
+    },
+    {
+      "label": "2025",
+      "path": "data/json/45368057-dfd7-4c56-9cac-5ca0e22ca086-v1-2b384a78d4c655d4-2025.json",
+      "total": 137991,
+      "sha256": "37a2b6f0b97a38f4c03d1076e8cf827e4d23c8e457121a72bff207d1e23fb66b",
+      "compressedSha256": "297cf5baf56d645887313e572caf17b7e95ffd4a3e2fa66e469fe32b21593c5f"
+    }
+  ]
+}

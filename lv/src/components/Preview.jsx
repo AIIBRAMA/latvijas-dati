@@ -59,6 +59,7 @@ export default function Preview({resource}) {
     }
     return <section className="preview panel" aria-label="Resursa priekšskatījums">
         <div className="section-heading"><div><span className="eyebrow">{local ? `NO ${localFormat} SAGATAVOTA TABULA` : 'DATI NO AVOTA'}</span><h2>{resource.name || 'Tabulas priekšskatījums'}</h2></div></div>
+        {jsonSource && resource.local_preview.snapshotFallback === true && <p className="notice" role="status"><strong>Rādīta pēdējā pieejamā pārbaudītā kopija.</strong> Valsts kases avotu atjaunošanas laikā nevarēja sasniegt. Kopijas dati pārbaudīti {new Date(resource.local_preview.sourceCheckedAt).toLocaleString('lv-LV', {timeZone: 'Europe/Riga'})} pēc Latvijas laika; kopija var nebūt aktuāla.</p>}
         {partition && <label className="sheet-select">Gads<select value={partition.label} onChange={selectYear} aria-describedby="preview-year-scope">{partitions.map(({label, total}) => <option key={label} value={label}>{label} ({number(total)} rindas)</option>)}</select></label>}
         {partition && <p className="caption" id="preview-year-scope">Lai ielādētu mazāk datu, vienlaikus atvērts tikai viens gads. Meklēšana, filtri un CSV attiecas uz izvēlēto gadu; vairāku gadu dati netiek apvienoti.</p>}
         {local && workbook && <>
