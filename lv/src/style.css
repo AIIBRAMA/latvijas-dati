@@ -22,4 +22,4 @@
 .iub-notice-id {font-family:monospace}
 @media(max-width:650px){.iub-notice-filters {grid-template-columns:minmax(0,1fr)}}
 
-.table-scroll td.amount-cell{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;overflow-wrap:normal}
+.table-scroll td.numeric-cell{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;overflow-wrap:normal}

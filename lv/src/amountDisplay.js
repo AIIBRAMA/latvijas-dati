@@ -31,9 +31,11 @@ export function isAmountField(field, dataset, cumulative = false) {
     });
 }
 
-// Work from the decimal text so even sums above Number.MAX_SAFE_INTEGER
-// format correctly when they arrive as strings. Trims display to cents only.
-export function formatAmount(value) {
+const NUMERIC_TYPE = /^(?:number|numeric|decimal|real|double precision|float[48]?|int(?:eger|[248])?|bigint|smallint|money)(?:\(\d+(?:,\s*\d+)?\))?$/i;
+const IDENTIFIER = /(?:^|_)(?:id|uuid|kods|kodi|koda|atslega|key|code|numurs|nr|nmr|cpv|atvk|nace|ekk|regnr|iban|gads|gada|year|menesis|ceturksnis|nedela|diena|datums|date|time|timestamp|pasta|talrunis|indekss|indeksa|identifikators|identifikacijas|registration|serial)(?:_|$)/;
+const MEASUREMENT = /(?:^|_)(?:skaits|procenti|procentos|proc|count|percent|percentage|koeficients|garums|platiba|augstums|svars|tilpums|daudzums|temperature|temperatura|weight|length|area|volume|quantity|kg|kwh|mwh)(?:_|$)/;
+
+function decimalParts(value) {
     if (typeof value !== 'string' && !Number.isFinite(value)) return null;
     let input = String(value).trim();
     if (input.length > 160) return null;
@@ -42,11 +44,38 @@ export function formatAmount(value) {
     if (!parts) return null;
     const [, sign, whole, fraction = '', exponent = '0'] = parts;
     const power = Number(exponent);
-    if (Math.abs(power) > 100 || (fraction.length + whole.length) > 100) return null;
+    if (Math.abs(power) > 100 || fraction.length + whole.length > 100) return null;
+    return {sign, whole, fraction, power};
+}
+const group = (digits) => digits.replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0');
+const displaySign = (sign) => sign === '-' ? '−' : sign;
+
+// Round monetary display from decimal text without losing precision to a Number conversion.
+export function formatAmount(value) {
+    const parts = decimalParts(value);
+    if (!parts) return null;
+    const {sign, whole, fraction, power} = parts;
     const digits = whole + fraction;
     const cut = whole.length + power + 2;
     let cents = cut <= 0 ? 0n : BigInt(digits.slice(0, cut).padEnd(cut, '0'));
     if (cut >= 0 && digits[cut] >= '5') cents += 1n;
-    const integer = String(cents / 100n).replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0');
-    return `${cents !== 0n && /[−-]/.test(sign) ? '−' : ''}${integer},${String(cents % 100n).padStart(2, '0')}`;
+    return `${cents !== 0n && /[−-]/.test(sign) ? '−' : ''}${group(String(cents / 100n))},${String(cents % 100n).padStart(2, '0')}`;
+}
+
+// General measurements retain all reported decimal digits. Unknown text, dates,
+// codes and leading-zero identifiers are never reinterpreted as measurements.
+export function formatDisplayNumber(field, value, monetary = false) {
+    if (monetary) return formatAmount(value);
+    if (!field) return null;
+    const keys = [field.id, field.sourceId].filter(Boolean).map(KEY);
+    if (keys.some((key) => IDENTIFIER.test(key))) return null;
+    if (typeof value !== 'number' && !NUMERIC_TYPE.test(field.type) && !keys.some((key) => MEASUREMENT.test(key)) && !/%/.test(field.id)) return null;
+    const parts = decimalParts(value);
+    if (!parts || /^0\d/.test(parts.whole)) return null;
+    const {sign, whole, fraction, power} = parts;
+    const digits = whole + fraction;
+    const cut = whole.length + power;
+    const integer = (cut <= 0 ? '0' : digits.slice(0, cut).padEnd(cut, '0')).replace(/^0+(?=\d)/, '');
+    const decimal = cut <= 0 ? '0'.repeat(-cut) + digits : digits.slice(cut);
+    return `${displaySign(sign)}${group(integer)}${decimal ? ',' + decimal : ''}`;
 }

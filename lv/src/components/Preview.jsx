@@ -1,6 +1,6 @@
 import React, {useEffect, useMemo, useState} from 'react';
 import {ckan} from '../api.js';
-import {formatAmount, isAmountField} from '../amountDisplay.js';
+import {formatAmount, formatDisplayNumber, isAmountField} from '../amountDisplay.js';
 import {csvCell, number, numeric} from '../data.js';
 import {COMPENSATION, RAIM, reportPartLabel} from '../treasuryMonthly.js';
 import {FILTERS, PRIMARY_FILTERS, chartCurrencyField, chartLabelField, filterOptions, filterRows, isAnnualPreview, isPublicXlsx, isReviewedXlsx, isTreasurySheets, localPreviewPartitions, localPreviewPath, localSourceFormat, localTreasurySheets, selectedTreasurySheetPath, previewCsvCell, rowsCsv, toRecords, validateWorkbook} from '../localPreview.js';
@@ -63,6 +63,7 @@ export default function Preview({resource, dataset}) {
     const numericFields = fields.filter((f) => (!local || f.id === 'Summa' || (reviewed && !cumulative && f.id === 'EUR')) && displayed.records.some((r) => numeric(r[f.id]) !== null));
     const xField = fields.find((f) => f.id === x)?.id || (local ? chartLabelField(fields) : fields[0]?.id);
     const yField = numericFields.find((f) => f.id === y)?.id || numericFields[0]?.id;
+    const yColumn = fields.find((f) => f.id === yField);
     const currencyField = local && chartCurrencyField(fields);
     const columnLabel = (id) => id === 'Summa' ? (annual ? 'Summa (EUR)' : jsonSource ? 'Summa (tāmes izmaiņu līmenī)' : id) : id;
     const points = useMemo(() => (displayed?.records || []).map((r) => ({label: String(r[xField] ?? ''), value: numeric(r[yField]), original: r[yField]})).filter((p) => p.value !== null), [displayed, xField, yField]);
@@ -118,12 +119,12 @@ export default function Preview({resource, dataset}) {
             {amountFields.size > 0 && <p className="caption">Summas attēlotas ar divām zīmēm aiz komata; CSV saglabā avota precizitāti.</p>}
             {view === 'table' ? <div className="table-scroll" tabIndex={0} role="region" aria-label="Ritināma datu tabula"><table><thead><tr>{fields.map((f) => <th key={f.id} scope="col">{columnLabel(f.id)}</th>)}</tr></thead><tbody>{displayed.records.map((row, i) => <tr key={i}>{fields.map((f) => {
                 const raw = row[f.id];
-                const amount = amountFields.has(f.id) ? formatAmount(raw) : null;
-                return <td key={f.id} className={amount === null ? undefined : 'amount-cell'} title={amount === null ? undefined : `Avota vērtība: ${raw}`}>{amount ?? (typeof raw === 'object' && raw !== null ? JSON.stringify(raw) : String(raw ?? '—'))}</td>;
+                const formatted = formatDisplayNumber(f, raw, amountFields.has(f.id));
+                return <td key={f.id} className={formatted === null ? undefined : 'numeric-cell'} title={formatted === null ? undefined : `Avota vērtība: ${raw}`}>{formatted ?? (typeof raw === 'object' && raw !== null ? JSON.stringify(raw) : String(raw ?? '—'))}</td>;
             })}</tr>)}</tbody></table>{!displayed.records.length && <p>Nav atrastu ierakstu. Mainiet meklējumu.</p>}</div> : numericFields.length ? <>
                 <div className="chart-selects"><label>Etiķetes<select value={xField} onChange={(e) => setX(e.target.value)}>{fields.map((f) => <option key={f.id} value={f.id}>{columnLabel(f.id)}</option>)}</select></label><label>Skaitliskā vērtība<select value={yField} onChange={(e) => setY(e.target.value)}>{numericFields.map((f) => <option key={f.id} value={f.id}>{columnLabel(f.id)}</option>)}</select></label></div>
                 <p className="caption">Attēloti {points.length} no šīs lapas {displayed.records.length} ierakstiem, bez summēšanas. Tukšas un neskaitliskas vērtības izlaistas. {currencyField ? `Valūta norādīta kolonnā ${currencyField}.` : annual ? 'Vērtības ir eiro (EUR).' : 'Mērvienību pārbaudiet resursa aprakstā.'} {local && 'Vienādas etiķetes diagrammā netiek apvienotas.'}</p>
-                <div className="bar-chart" aria-label={`${columnLabel(yField)} pēc ${columnLabel(xField)}`}>{points.map((p, i) => <div className="bar-row" key={i}><span title={p.label}>{p.label}</span><div className="bar-track"><i className="zero" style={{left: `${zero}%`}}/><i className={p.value < 0 ? 'bar negative' : 'bar'} style={{left: `${(Math.min(0, p.value) - low) / span * 100}%`, width: `${Math.abs(p.value) / span * 100}%`}}/></div><strong>{(amountFields.has(yField) ? formatAmount(p.original) : null) ?? number(p.value)}</strong></div>)}</div>
+                <div className="bar-chart" aria-label={`${columnLabel(yField)} pēc ${columnLabel(xField)}`}>{points.map((p, i) => <div className="bar-row" key={i}><span title={p.label}>{p.label}</span><div className="bar-track"><i className="zero" style={{left: `${zero}%`}}/><i className={p.value < 0 ? 'bar negative' : 'bar'} style={{left: `${(Math.min(0, p.value) - low) / span * 100}%`, width: `${Math.abs(p.value) / span * 100}%`}}/></div><strong>{formatDisplayNumber(yColumn, p.original, amountFields.has(yField)) ?? String(p.original)}</strong></div>)}</div>
             </> : <p className="notice">Šajā lapā nav diagrammai izmantojamu skaitlisku vērtību.</p>}
             <div className="pagination"><button disabled={!currentPage} onClick={() => setPage(currentPage - 1)}>← Iepriekšējā</button><span>{currentPage + 1}. lapa · līdz 50 ierakstiem</span><button disabled={(currentPage + 1) * 50 >= displayed.total} onClick={() => setPage(currentPage + 1)}>Nākamā →</button></div>
         </>}

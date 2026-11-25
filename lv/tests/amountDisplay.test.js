@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {formatAmount, isAmountField} from '../src/amountDisplay.js';
+import {formatAmount, formatDisplayNumber, isAmountField} from '../src/amountDisplay.js';
 import {csvCell} from '../src/data.js';
 import {previewCsvCell} from '../src/localPreview.js';
 
@@ -41,4 +41,20 @@ test('both CSV paths retain the original numeric precision', () => {
     const value = '36491.440000000002';
     assert.equal(csvCell(value), '"' + value + '"');
     assert.equal(previewCsvCell({id:'Summa', type:'number', exactExcelNumber:true}, value), '"' + value + '"');
+});
+test('applies Latvian notation to numerical data without losing precision', () => {
+    assert.equal(formatDisplayNumber({id:'Rezultāts', type:'numeric'}, '12345.678900'), `12${gap}345,678900`);
+    assert.equal(formatDisplayNumber({id:'Diennakts_temperatūra', type:'float'}, 1.234e-7), '0,0000001234');
+    assert.equal(formatDisplayNumber(field('Saistibu_apmers_procenti'), '12.1234'), '12,1234');
+    assert.equal(formatDisplayNumber(field('Ierakstu skaits'), '10000'), `10${gap}000`);
+    assert.equal(formatDisplayNumber(field('Daudzums'), '9007199254740993'), `9${gap}007${gap}199${gap}254${gap}740${gap}993`);
+    assert.equal(formatDisplayNumber(field('Daudzums'), '-0,00700'), '−0,00700');
+    assert.equal(formatDisplayNumber({id:'Value',type:'text'}, '31233'), null);
+    assert.equal(formatDisplayNumber({id:'Value',type:'integer'}, '0031233'), null);
+});
+test('leaves identifier, year and date fields untouched even when typed as integers', () => {
+    for (const id of ['Gads','Iestades_NMR','Vienotais_EKK_Atslega_7_limenis','Pasvaldiba_ATVK_kods','Datums','Pasta_indekss','Tālrunis','Personas kods','Reģistrācijas numurs','Mēnesis']) {
+        assert.equal(formatDisplayNumber({id,type:'int'}, 20261125), null, id);
+    }
+    assert.equal(formatDisplayNumber(field('Summa'), '2026', true), `2${gap}026,00`);
 });
