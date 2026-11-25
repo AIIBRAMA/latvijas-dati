@@ -3,11 +3,14 @@
 const KEY = (value) => String(value ?? '').normalize('NFD').replace(/\p{M}/gu, '')
     .toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
 
+const PERIOD_BUDGET = ['finansesanas_plans_gadam_ar_izmainam', 'ienemumi', 'izdevumi', 'finansesana', 'izpilde_pa_finansesanas_kodiem'];
+
 const FINANCIAL_COLUMNS = new Map([
     ['pasvaldibu-parads-euro', new Set(['value'])],
     ['pasvaldibu-pamatbudzeta-izdevumi', new Set(['kop_izd', 'uztur_izd', 'kap_izd', 'izd_atlidzib', 'soc_pab_iz', 'iemak_pfif', 'parejie_izd_pec_uzkr'])],
     ['pasvaldibu-pamatbudzeta-ienemumi', new Set(['kop_ien', 'nod_ien_kopa', 'iin_ien', 'nin_ien', 'dot_pfif'])],
-    ['pasvaldibu-budzetu-ienemumi-un-izdevumi-pa-menesiem', new Set(['finansesanas_plans_gadam_ar_izmainam', 'ienemumi', 'izdevumi', 'finansesana'])],
+    ['pasvaldibu-budzetu-ienemumi-un-izdevumi-pa-menesiem', new Set(PERIOD_BUDGET)],
+    ['valsts-budzeta-izpilde-pa-iestadem-budzeta-programmam-apaksprogrammam-un-klasifikacijas-kodiem', new Set(PERIOD_BUDGET)],
     ['valsts-un-pasvaldibu-sektora-ceturksna-finansu-dati', new Set([
         'parskata_perioda_sakuma', 'parskata_perioda_beigas', 'parskata_perioda_sakuma_bruto',
         'parskata_perioda_sakuma_vertibas_samazinajums', 'parskata_perioda_sakuma_neto',
@@ -32,7 +35,8 @@ export function isAmountField(field, dataset, cumulative = false) {
 }
 
 const NUMERIC_TYPE = /^(?:number|numeric|decimal|real|double precision|float[48]?|int(?:eger|[248])?|bigint|smallint|money)(?:\(\d+(?:,\s*\d+)?\))?$/i;
-const IDENTIFIER = /(?:^|_)(?:id|uuid|kods|kodi|koda|atslega|key|code|numurs|nr|nmr|cpv|atvk|nace|ekk|regnr|iban|gads|gada|year|menesis|ceturksnis|nedela|diena|datums|date|time|timestamp|pasta|talrunis|indekss|indeksa|identifikators|identifikacijas|registration|serial)(?:_|$)/;
+const IDENTIFIER = /(?:^|_)(?:id|uuid|kods|kodi|koda|atslega|key|code|numurs|nr|nmr|cpv|atvk|nace|ekk|regnr|iban|gads|year|menesis|ceturksnis|nedela|diena|datums|datumu|date|time|timestamp|nosaukums|valuta|pasta|talrunis|identifikators|identifikacijas|registration|serial)(?:_|$)/;
+const ENTITY_FIELD = /^(?:iestade|ministrija|pasvaldiba|pasv|programma|apaksprogramma|funkcija|klasifikacija|konsolidacija|budzeta_tips|dati_par_periodu_(?:no|lidz)|gramatvedibas_kontu_grupas_\d_limenis|iestades_institucionalais_sektors|pretsektors(?:_\d_limenis)?)$/;
 const MEASUREMENT = /(?:^|_)(?:skaits|procenti|procentos|proc|count|percent|percentage|koeficients|garums|platiba|augstums|svars|tilpums|daudzums|temperature|temperatura|weight|length|area|volume|quantity|kg|kwh|mwh)(?:_|$)/;
 
 function decimalParts(value) {
@@ -68,7 +72,7 @@ export function formatDisplayNumber(field, value, monetary = false) {
     if (monetary) return formatAmount(value);
     if (!field) return null;
     const keys = [field.id, field.sourceId].filter(Boolean).map(KEY);
-    if (keys.some((key) => IDENTIFIER.test(key))) return null;
+    if (keys.some((key) => IDENTIFIER.test(key) || ENTITY_FIELD.test(key))) return null;
     if (typeof value !== 'number' && !NUMERIC_TYPE.test(field.type) && !keys.some((key) => MEASUREMENT.test(key)) && !/%/.test(field.id)) return null;
     const parts = decimalParts(value);
     if (!parts || /^0\d/.test(parts.whole)) return null;

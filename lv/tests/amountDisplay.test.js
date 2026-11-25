@@ -58,3 +58,13 @@ test('leaves identifier, year and date fields untouched even when typed as integ
     }
     assert.equal(formatDisplayNumber(field('Summa'), '2026', true), `2${gap}026,00`);
 });
+test('historical Treasury execution: separate the institution code from the four money columns', () => {
+    const dataset = 'valsts-budzeta-izpilde-pa-iestadem-budzeta-programmam-apaksprogrammam-un-klasifikacijas-kodiem';
+    const historical = ['Finansēšanas plāns gadam\n(ar izmaiņām)', 'Ieņēmumi', 'Izdevumi', 'Izpilde pa finansēšanas kodiem'];
+    for (const id of historical) {
+        const f = {id,type:'numeric'};
+        assert.equal(formatDisplayNumber(f, '1234.567890', isAmountField(f,dataset)), `1${gap}234,57`, id);
+    }
+    assert.equal(formatDisplayNumber({id:'Iestāde',type:'numeric'}, 1234),null);
+    assert.equal(formatDisplayNumber({id:'Cenu indekss',type:'numeric'}, '1234.5'), `1${gap}234,5`);
+});
